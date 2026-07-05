@@ -12,3 +12,10 @@ export const createHousingSchema = z.object({
   contactPhone: z.string().min(1, 'El teléfono de contacto es obligatorio'),
   images: z.array(z.string()).optional()
 });
+
+export const uploadImagesSchema = z.object({
+  images: z
+    .array(z.string().min(1))
+    .min(1, 'Debes enviar al menos una imagen')
+    .max(8, 'Máximo 8 imágenes por publicación')
+});

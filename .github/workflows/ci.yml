@@ -1,0 +1,70 @@
+# CI de solo pruebas (sin deploy — no hay credenciales de Railway/hosting
+# configuradas para este proyecto).
+#
+# IMPORTANTE: la suite del backend prueba contra un proyecto Supabase REAL,
+# no con mocks (crea y borra usuarios/habitaciones de verdad). Los secrets
+# SUPABASE_* de abajo deben apuntar a un proyecto de PRUEBA/DEV dedicado,
+# nunca al de producción. Configúralos en:
+# Settings > Secrets and variables > Actions, en este repositorio.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Tests con cobertura (umbral 90% enforced en jest.config.cjs)
+        run: npm test
+        env:
+          NODE_ENV: test
+          PORT: 5002
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_JWKS_URL: ${{ secrets.SUPABASE_JWKS_URL }}
+          NOMINATIM_USER_AGENT: yachakuqwasi-ci
+          ALLOWED_ORIGINS: http://localhost:5173
+          RATE_LIMIT_WINDOW_MS: 900000
+          RATE_LIMIT_MAX_REQUESTS: 1000
+          LOG_LEVEL: silent
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  root-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint

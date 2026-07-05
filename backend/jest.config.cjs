@@ -9,6 +9,7 @@ module.exports = {
     'src/**/*.js',
     '!src/server.js',
     '!src/app.js',
+    '!src/container.js',
     '!src/config/**/*.js',
     '!src/models/index.js',
     '!src/migrations/**',

@@ -13,3 +13,11 @@ export function findApprovedHousings({ tipo, precioMax, barrio } = {}) {
 
   return query;
 }
+
+export function findHousingById(id) {
+  return supabaseAdmin.from('housing_listings').select('*').eq('id', id).single();
+}
+
+export function updateHousingImages(id, images) {
+  return supabaseAdmin.from('housing_listings').update({ images }).eq('id', id).select().single();
+}

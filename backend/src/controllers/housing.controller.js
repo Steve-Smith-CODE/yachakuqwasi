@@ -1,8 +1,13 @@
-import { createHousing, listHousings } from '../services/housing.service.js';
+import { createHousing, listHousings, addHousingImages } from '../services/housing.service.js';
 
 export async function create(req, res) {
   const listing = await createHousing(req.user.id, req.body);
   res.status(201).json(listing);
+}
+
+export async function uploadImages(req, res) {
+  const listing = await addHousingImages(req.params.id, req.user, req.body.images);
+  res.json(listing);
 }
 
 export async function list(req, res) {

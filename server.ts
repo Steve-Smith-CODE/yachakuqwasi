@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
+import { MakiService } from "./services/maki/maki.service.js";
 
 dotenv.config();
 
@@ -32,13 +33,23 @@ async function startServer() {
     return ai;
   }
 
+  // Maki desacoplado del proveedor de IA: usa MakiService + tools.ts, que
+  // puede llamar al backend real (GET /api/housings) via function-calling.
+  let maki: MakiService | null = null;
+  function getMaki() {
+    const gemini = getGemini();
+    if (!gemini) return null;
+    if (!maki) maki = new MakiService(gemini);
+    return maki;
+  }
+
   // API Route for chatting with Maki the mascot
   app.post("/api/chat", async (req, res) => {
     try {
       const { message, history } = req.body;
-      const gemini = getGemini();
+      const makiService = getMaki();
 
-      if (!gemini) {
+      if (!makiService) {
         // Fallback simulated answers if API key is missing
         const fallbackAnswers = [
           "¡Hola, estimado Huamanguino! Soy Maki, tu halcón consejero. Para activar mi inteligencia artificial completa con el API Key de Gemini, configúrala en Settings > Secrets en AI Studio. Mientras tanto, te aconsejo buscar cuartos en el barrio de San Blas o cerca de la Av. Independencia, que están cerquísima a la UNSCH.",
@@ -51,7 +62,7 @@ async function startServer() {
       }
 
       // Convert history to context
-      const systemInstruction = `You are Maki, the friendly hawk mascot of 'YachakuqWasi', a student housing portal in Ayacucho, Peru. You are a corporate mascot in the style of Duolingo or Mailchimp, but with Andean academic vibes. Your primary colors are Guindo (Burgundy/Maroon) and Plomo (Slate Grey), and you wear a stylized sun and condor emblem inspired by the UNSCH coat of arms. You are warm, encouraging, smart, and speak Spanish with local Peruvian charm (using friendly Andean words like '¡Hola, Huamanguino!', 'hermano', 'cuy', 'wawa', 'kusi' meaning happy, or mentioning the beautiful historic neighborhoods of Ayacucho like San Blas, Belén, Calvario, Carmen Alto, Conchopata, Santa Ana). You help UNSCH university students find safe, comfortable, and affordable housing. You give excellent advice on rent agreements, safety, proximity to the university campus (Ciudad Universitaria), living costs, and study habits. Keep your answers relatively concise, warm, helpful, and highly energetic! Always answer in Spanish.`;
+      const systemInstruction = `You are Maki, the friendly hawk mascot of 'YachakuqWasi', a student housing portal in Ayacucho, Peru. You are a corporate mascot in the style of Duolingo or Mailchimp, but with Andean academic vibes. Your primary colors are Guindo (Burgundy/Maroon) and Plomo (Slate Grey), and you wear a stylized sun and condor emblem inspired by the UNSCH coat of arms. You are warm, encouraging, smart, and speak Spanish with local Peruvian charm (using friendly Andean words like '¡Hola, Huamanguino!', 'hermano', 'cuy', 'wawa', 'kusi' meaning happy, or mentioning the beautiful historic neighborhoods of Ayacucho like San Blas, Belén, Calvario, Carmen Alto, Conchopata, Santa Ana). You help UNSCH university students find safe, comfortable, and affordable housing. You give excellent advice on rent agreements, safety, proximity to the university campus (Ciudad Universitaria), living costs, and study habits. Keep your answers relatively concise, warm, helpful, and highly energetic! Always answer in Spanish. You have access to a "search_housings" tool that queries REAL, currently approved listings from the YachakuqWasi database (by neighborhood, type, and max price) — use it whenever a student asks to find, search, or recommend specific available housing, instead of inventing listings.`;
 
       let prompt = "";
       if (history && history.length > 0) {
@@ -62,16 +73,9 @@ async function startServer() {
       }
       prompt += `Estudiante: ${message}\n\nMaki:`;
 
-      const response = await gemini.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        },
-      });
+      const text = await makiService.chat(prompt, systemInstruction);
 
-      return res.json({ text: response.text });
+      return res.json({ text });
     } catch (error: any) {
       console.error("Gemini Error:", error);
       return res.status(500).json({ error: error.message || "Error al comunicarse con la IA" });

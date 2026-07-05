@@ -9,6 +9,8 @@ import errorHandler from './middlewares/errorHandler.middleware.js';
 import authRoutes from './routes/auth.routes.js';
 import housingRoutes from './routes/housing.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import roommatesRoutes from './routes/roommates.routes.js';
+import chatRoutes from './routes/chat.routes.js';
 import logger from './config/logger.js';
 import swaggerSpec from './config/swagger.config.js';
 import swaggerUi from 'swagger-ui-express';
@@ -75,6 +77,8 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/auth', authRoutes);
 app.use('/api/housings', housingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/roommates', roommatesRoutes);
+app.use('/api/chats', chatRoutes);
 
 // 404
 app.use((req, res) => {

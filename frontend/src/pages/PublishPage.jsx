@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { createHousingRequest } from "../api/housings.js";
+import { createHousingRequest, uploadHousingImagesRequest } from "../api/housings.js";
 import { ApiError } from "../api/client.js";
+
+const MAX_PHOTOS = 8;
 
 const initialForm = {
   title: "",
@@ -12,18 +14,27 @@ const initialForm = {
   address: "",
   description: "",
   contactPhone: "",
-  amenities: [],
-  images: []
+  amenities: []
 };
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function PublishPage() {
   const { token } = useAuth();
   const [form, setForm] = useState(initialForm);
   const [amenityInput, setAmenityInput] = useState("");
-  const [imageUrlInput, setImageUrlInput] = useState("");
+  const [photos, setPhotos] = useState([]); // [{file, previewUrl}]
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   function set(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -37,12 +48,19 @@ export default function PublishPage() {
     }
   }
 
-  function addImage() {
-    const value = imageUrlInput.trim();
-    if (value) {
-      set("images", [...form.images, value]);
-      setImageUrlInput("");
-    }
+  function handlePhotoSelect(fileList) {
+    const remainingSlots = MAX_PHOTOS - photos.length;
+    if (remainingSlots <= 0) return;
+
+    const newPhotos = Array.from(fileList)
+      .slice(0, remainingSlots)
+      .map((file) => ({ file, previewUrl: URL.createObjectURL(file) }));
+
+    setPhotos((prev) => [...prev, ...newPhotos]);
+  }
+
+  function removePhoto(index) {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e) {
@@ -51,13 +69,22 @@ export default function PublishPage() {
     setSuccess(null);
     setLoading(true);
     try {
-      const listing = await createHousingRequest(token, form);
+      let listing = await createHousingRequest(token, form);
+
+      if (photos.length > 0) {
+        setUploadingPhotos(true);
+        const dataUrls = await Promise.all(photos.map((p) => fileToDataUrl(p.file)));
+        listing = await uploadHousingImagesRequest(token, listing.id, dataUrls);
+      }
+
       setSuccess(listing);
       setForm(initialForm);
+      setPhotos([]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo publicar la habitación.");
     } finally {
       setLoading(false);
+      setUploadingPhotos(false);
     }
   }
 
@@ -201,27 +228,43 @@ export default function PublishPage() {
 
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase text-slate-500">
-              Fotos (URLs de imagen) — {form.images.length}
+              Fotos — {photos.length}/{MAX_PHOTOS}
             </label>
-            <div className="flex gap-2">
-              <input
-                value={imageUrlInput}
-                onChange={(e) => setImageUrlInput(e.target.value)}
-                placeholder="https://..."
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-guindo"
-              />
-              <button type="button" onClick={addImage} className="px-3 py-2 bg-guindo text-white rounded-xl text-xs font-bold cursor-pointer">
-                Agregar
-              </button>
-            </div>
-            {form.images.length > 0 && (
+            <p className="text-[10px] text-slate-400 -mt-0.5">
+              Se suben de verdad a Supabase Storage al publicar (recomendamos más de 3).
+            </p>
+
+            <label
+              htmlFor="publish-photo-input"
+              className={`flex items-center justify-center gap-1.5 border-2 border-dashed rounded-xl py-3 text-xs font-bold transition-all ${
+                photos.length >= MAX_PHOTOS
+                  ? "border-slate-100 text-slate-300 cursor-not-allowed"
+                  : "border-guindo/30 text-guindo hover:bg-guindo/5 cursor-pointer"
+              }`}
+            >
+              Subir fotos
+            </label>
+            <input
+              id="publish-photo-input"
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={photos.length >= MAX_PHOTOS}
+              onChange={(e) => {
+                handlePhotoSelect(e.target.files);
+                e.target.value = "";
+              }}
+              className="hidden"
+            />
+
+            {photos.length > 0 && (
               <div className="grid grid-cols-4 gap-2 mt-2">
-                {form.images.map((src, i) => (
+                {photos.map((p, i) => (
                   <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
-                    <img src={src} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                    <img src={p.previewUrl} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
                     <button
                       type="button"
-                      onClick={() => set("images", form.images.filter((_, idx) => idx !== i))}
+                      onClick={() => removePhoto(i)}
                       className="absolute top-0.5 right-0.5 bg-slate-900/70 text-white rounded-full h-4 w-4 text-[10px] font-bold cursor-pointer"
                     >
                       ×
@@ -237,7 +280,7 @@ export default function PublishPage() {
             disabled={loading}
             className="w-full bg-guindo text-white py-2.5 rounded-xl text-sm font-black hover:bg-guindo-dark disabled:opacity-50 cursor-pointer"
           >
-            {loading ? "Publicando..." : "Publicar"}
+            {loading ? (uploadingPhotos ? "Subiendo fotos..." : "Publicando...") : "Publicar"}
           </button>
         </form>
       </div>
