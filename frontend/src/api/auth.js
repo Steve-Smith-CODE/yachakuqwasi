@@ -1,0 +1,15 @@
+import { apiFetch } from "./client.js";
+
+export function registerRequest({ email, password, name, role, faculty, career, phone }) {
+  return apiFetch("/auth/register", {
+    method: "POST",
+    body: { email, password, name, role, faculty, career, phone }
+  });
+}
+
+export function loginRequest({ email, password }) {
+  return apiFetch("/auth/login", {
+    method: "POST",
+    body: { email, password }
+  });
+}

@@ -10,6 +10,8 @@ import authRoutes from './routes/auth.routes.js';
 import housingRoutes from './routes/housing.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import logger from './config/logger.js';
+import swaggerSpec from './config/swagger.config.js';
+import swaggerUi from 'swagger-ui-express';
 
 const app = express();
 
@@ -58,17 +60,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Swagger solo en desarrollo
+// Swagger solo en desarrollo (registro sincrono: si fuera async via import()
+// dinamico, la ruta se registraria despues del handler 404 de abajo y nunca
+// respondería — Express matchea rutas en el orden en que se registran).
 if (process.env.NODE_ENV === 'development') {
-  import('./config/swagger.config.js').then(({ default: swaggerSpec }) => {
-    import('swagger-ui-express').then(({ default: swaggerUi }) => {
-      app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-        explorer: true,
-        customSiteTitle: 'API - Alquileres UNSCH'
-      }));
-      logger.info('Swagger disponible en http://localhost:' + process.env.PORT + '/api-docs');
-    });
-  });
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    customSiteTitle: 'API - Alquileres UNSCH'
+  }));
+  logger.info('Swagger disponible en http://localhost:' + process.env.PORT + '/api-docs');
 }
 
 // Rutas de la API

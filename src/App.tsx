@@ -33,7 +33,8 @@ import {
   Mail,
   UserCheck,
   LogOut,
-  ExternalLink
+  ExternalLink,
+  ImagePlus
 } from "lucide-react";
 import { HOUSING_LISTINGS, MACOT_TIPS, STUDENT_TESTIMONIALS } from "./data";
 import { HousingListing, MascotTip } from "./types";
@@ -291,6 +292,7 @@ export default function App() {
 
   // Selected Listing Detail Modal
   const [selectedListing, setSelectedListing] = useState<HousingListing | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Landlord Room Submit Form Modal
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -305,8 +307,37 @@ export default function App() {
     amenities: [] as string[],
     contactPhone: "",
     landlordName: "",
+    images: [] as string[],
   });
   const [amenityInput, setAmenityInput] = useState("");
+  const MAX_LISTING_PHOTOS = 8;
+
+  // Convierte las fotos seleccionadas (arrendador o admin) a data URLs para previsualizarlas
+  const handleAddImages = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remainingSlots = MAX_LISTING_PHOTOS - newRoom.images.length;
+    if (remainingSlots <= 0) {
+      alert(`Ya alcanzaste el máximo de ${MAX_LISTING_PHOTOS} fotos por publicación.`);
+      return;
+    }
+
+    Array.from(files).slice(0, remainingSlots).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          setNewRoom(prev => ({ ...prev, images: [...prev.images, reader.result as string] }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setNewRoom(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index)
+    }));
+  };
   const [formSuccess, setFormSuccess] = useState(false);
 
   // Maki Chat Companion state
@@ -363,6 +394,11 @@ export default function App() {
       setActiveMainTab("explore");
     }
   }, [currentUser, activeMainTab]);
+
+  // Reinicia la galeria de fotos cada vez que se abre una publicacion distinta
+  useEffect(() => {
+    setGalleryIndex(0);
+  }, [selectedListing?.id]);
 
   // Handle scroll progress
   const handleScroll = () => {
@@ -685,9 +721,9 @@ export default function App() {
       contactPhone: newRoom.contactPhone,
       landlordName: newRoom.landlordName,
       verifiedByMaki: true,
-      images: [
-        "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80"
-      ],
+      images: newRoom.images.length > 0
+        ? newRoom.images
+        : ["https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80"],
       coordinates: {
         x: Math.floor(Math.random() * 50) + 25,
         y: Math.floor(Math.random() * 50) + 25
@@ -710,6 +746,7 @@ export default function App() {
         amenities: [],
         contactPhone: "",
         landlordName: "",
+        images: [],
       });
     }, 1500);
   };
@@ -3770,15 +3807,51 @@ export default function App() {
               className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative z-10 border border-slate-100 overflow-hidden"
             >
               
-              {/* Image Banner */}
+              {/* Image Banner / Gallery de fotos */}
               <div className="relative h-48 -mx-6 -mt-6 bg-slate-100 overflow-hidden mb-4">
                 <img
-                  src={selectedListing.images[0]}
-                  alt={selectedListing.title}
+                  src={selectedListing.images[galleryIndex] ?? selectedListing.images[0]}
+                  alt={`${selectedListing.title} - foto ${galleryIndex + 1}`}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
-                
+
+                {selectedListing.images.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setGalleryIndex((i) => (i === 0 ? selectedListing.images.length - 1 : i - 1))}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white backdrop-blur-sm p-1 rounded-full shadow-md text-slate-700 transition-colors cursor-pointer z-10"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGalleryIndex((i) => (i === selectedListing.images.length - 1 ? 0 : i + 1))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white backdrop-blur-sm p-1 rounded-full shadow-md text-slate-700 transition-colors cursor-pointer z-10"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+                      {selectedListing.images.map((_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setGalleryIndex(i)}
+                          className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                            i === galleryIndex ? "w-4 bg-white" : "w-1.5 bg-white/60"
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    <span className="absolute bottom-2 right-3 bg-slate-900/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md z-10">
+                      {galleryIndex + 1}/{selectedListing.images.length}
+                    </span>
+                  </>
+                )}
+
                 <div className="absolute top-4 left-4 flex gap-2 z-10">
                   {selectedListing.verifiedByMaki && (
                     <span className="bg-[#FFC000] text-slate-900 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider font-mono shadow">
@@ -3793,11 +3866,29 @@ export default function App() {
                 {/* Close Button on image corner */}
                 <button
                   onClick={() => setSelectedListing(null)}
-                  className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-1.5 rounded-xl shadow-md text-slate-700 hover:text-slate-950 transition-colors cursor-pointer"
+                  className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-1.5 rounded-xl shadow-md text-slate-700 hover:text-slate-950 transition-colors cursor-pointer z-10"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
+
+              {/* Thumbnail strip: navegacion rapida entre todas las fotos */}
+              {selectedListing.images.length > 1 && (
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mt-2 mb-2">
+                  {selectedListing.images.map((img, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setGalleryIndex(i)}
+                      className={`shrink-0 h-10 w-14 rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                        i === galleryIndex ? "border-guindo" : "border-transparent opacity-70 hover:opacity-100"
+                      }`}
+                    >
+                      <img src={img} alt={`Miniatura ${i + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Title & Neighborhood */}
               <div className="space-y-2">
@@ -4119,8 +4210,59 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Photo upload widget: arrendador o admin pueden subir varias fotos */}
+                  <div className="space-y-1 text-left">
+                    <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">
+                      Fotos de la Habitación ({newRoom.images.length}/{MAX_LISTING_PHOTOS})
+                    </label>
+                    <p className="text-[10px] text-slate-400 -mt-0.5">
+                      Agrega varias fotos (recomendamos más de 3) para que los estudiantes puedan ver el lugar a detalle.
+                    </p>
+
+                    <label
+                      htmlFor="listing-photo-input"
+                      className={`flex items-center justify-center gap-1.5 border-2 border-dashed rounded-xl py-3 text-xs font-bold transition-all ${
+                        newRoom.images.length >= MAX_LISTING_PHOTOS
+                          ? "border-slate-100 text-slate-300 cursor-not-allowed"
+                          : "border-guindo/30 text-guindo hover:bg-guindo/5 cursor-pointer"
+                      }`}
+                    >
+                      <ImagePlus className="h-4 w-4" />
+                      <span>Subir fotos</span>
+                    </label>
+                    <input
+                      id="listing-photo-input"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={newRoom.images.length >= MAX_LISTING_PHOTOS}
+                      onChange={(e) => {
+                        handleAddImages(e.target.files);
+                        e.target.value = "";
+                      }}
+                      className="hidden"
+                    />
+
+                    {newRoom.images.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2 mt-2">
+                        {newRoom.images.map((img, i) => (
+                          <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
+                            <img src={img} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(i)}
+                              className="absolute top-0.5 right-0.5 bg-slate-900/70 text-white rounded-full h-4 w-4 flex items-center justify-center text-[10px] leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
-                    
+
                     <div className="space-y-1 text-left">
                       <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Nombre del Arrendador</label>
                       <input

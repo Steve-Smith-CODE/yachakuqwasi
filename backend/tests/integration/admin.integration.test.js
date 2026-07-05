@@ -4,10 +4,14 @@ import { supabaseAdmin } from '../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../helpers/testData.js';
 
 const createdDocIds = [];
+const createdListingIds = [];
 
 afterAll(async () => {
   for (const id of createdDocIds.splice(0)) {
     await supabaseAdmin.from('verification_documents').delete().eq('id', id).catch?.(() => {});
+  }
+  for (const id of createdListingIds.splice(0)) {
+    await supabaseAdmin.from('housing_listings').delete().eq('id', id).catch?.(() => {});
   }
   await cleanupCreatedUsers();
 });
@@ -79,6 +83,71 @@ describe('Admin Integration (Supabase local real)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Usuario bloqueado');
+  });
+
+  it('debe listar una habitacion pendiente real, aprobarla, y que pase a aparecer en el listado publico', async () => {
+    const admin = await createRealUser({ role: 'admin' });
+    const token = await loginAndGetToken(admin);
+    const landlord = await createRealUser({ role: 'landlord' });
+    const { data: listing } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlord.id,
+        title: 'Habitacion pendiente integration',
+        price_pen: 260,
+        distance_to_unsch_minutes: 5,
+        neighborhood: 'Carmen Alto',
+        address: 'Jr. Integration Pendiente 1',
+        contact_phone: '900000000',
+        status: 'pending'
+      })
+      .select()
+      .single();
+    createdListingIds.push(listing.id);
+
+    const pendingRes = await request(app)
+      .get('/api/admin/habitaciones/pendientes')
+      .set('Authorization', `Bearer ${token}`);
+    expect(pendingRes.status).toBe(200);
+    expect(pendingRes.body.map((l) => l.id)).toContain(listing.id);
+
+    const approveRes = await request(app)
+      .put(`/api/admin/habitaciones/${listing.id}/estado`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ estado: 'approved' });
+    expect(approveRes.status).toBe(200);
+    expect(approveRes.body.listing.status).toBe('approved');
+
+    const publicRes = await request(app).get('/api/housings?barrio=Carmen Alto');
+    expect(publicRes.body.map((l) => l.id)).toContain(listing.id);
+  });
+
+  it('debe rechazar el cambio de estado de habitacion si "estado" no es valido', async () => {
+    const admin = await createRealUser({ role: 'admin' });
+    const token = await loginAndGetToken(admin);
+    const landlord = await createRealUser({ role: 'landlord' });
+    const { data: listing } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlord.id,
+        title: 'Habitacion estado invalido integration',
+        price_pen: 260,
+        distance_to_unsch_minutes: 5,
+        neighborhood: 'Carmen Alto',
+        address: 'Jr. Integration Invalido 1',
+        contact_phone: '900000000',
+        status: 'pending'
+      })
+      .select()
+      .single();
+    createdListingIds.push(listing.id);
+
+    const res = await request(app)
+      .put(`/api/admin/habitaciones/${listing.id}/estado`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ estado: 'no-es-un-estado-valido' });
+
+    expect(res.status).toBe(400);
   });
 
   it('debe rechazar la revision de documento si "estado" no es approved/rejected', async () => {

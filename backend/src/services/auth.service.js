@@ -1,11 +1,14 @@
-import { supabasePublic, supabaseAdmin } from '../config/supabase.js';
+import { createAuthUser, signInWithPassword, findProfileById } from '../repositories/auth.repository.js';
 
 export async function registerUser({ email, password, name, role, faculty, career, phone }) {
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+  const { data, error } = await createAuthUser({
     email,
     password,
-    email_confirm: true,
-    user_metadata: { name, role: role || 'student', faculty, career, phone }
+    name,
+    role: role || 'student',
+    faculty,
+    career,
+    phone
   });
 
   if (error) {
@@ -18,7 +21,7 @@ export async function registerUser({ email, password, name, role, faculty, caree
 }
 
 export async function loginUser({ email, password }) {
-  const { data, error } = await supabasePublic.auth.signInWithPassword({ email, password });
+  const { data, error } = await signInWithPassword({ email, password });
 
   if (error) {
     const err = new Error('Credenciales invalidas');
@@ -26,11 +29,7 @@ export async function loginUser({ email, password }) {
     throw err;
   }
 
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('*')
-    .eq('id', data.user.id)
-    .single();
+  const { data: profile } = await findProfileById(data.user.id);
 
   return {
     token: data.session.access_token,

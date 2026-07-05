@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-guindo: #7a1f3a;
+  --color-guindo-dark: #5c1729;
+  --color-plomo: #52565e;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}

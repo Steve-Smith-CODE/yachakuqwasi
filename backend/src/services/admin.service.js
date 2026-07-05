@@ -1,13 +1,20 @@
-import { supabaseAdmin } from '../config/supabase.js';
+import {
+  countProfiles,
+  countHousings,
+  countPendingDocuments,
+  findPendingDocuments,
+  updateDocumentStatus,
+  updateProfileVerification,
+  findPendingHousings,
+  updateHousingStatusRecord,
+  updateProfileBlock
+} from '../repositories/admin.repository.js';
 
 export async function getStats() {
   const [users, housings, pendingDocs] = await Promise.all([
-    supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }),
-    supabaseAdmin.from('housing_listings').select('*', { count: 'exact', head: true }),
-    supabaseAdmin
-      .from('verification_documents')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending')
+    countProfiles(),
+    countHousings(),
+    countPendingDocuments()
   ]);
 
   return {
@@ -18,10 +25,7 @@ export async function getStats() {
 }
 
 export async function getPendingDocuments() {
-  const { data, error } = await supabaseAdmin
-    .from('verification_documents')
-    .select('*, profiles!verification_documents_user_id_fkey(name, role)')
-    .eq('status', 'pending');
+  const { data, error } = await findPendingDocuments();
 
   if (error) {
     const err = new Error(error.message);
@@ -33,12 +37,7 @@ export async function getPendingDocuments() {
 }
 
 export async function reviewDocument(docId, { estado, comentario }) {
-  const { data: doc, error } = await supabaseAdmin
-    .from('verification_documents')
-    .update({ status: estado, comment: comentario, reviewed_at: new Date().toISOString() })
-    .eq('id', docId)
-    .select()
-    .single();
+  const { data: doc, error } = await updateDocumentStatus(docId, { status: estado, comment: comentario });
 
   if (error) {
     const err = new Error(error.message);
@@ -47,27 +46,42 @@ export async function reviewDocument(docId, { estado, comentario }) {
   }
 
   if (estado === 'approved') {
-    await supabaseAdmin
-      .from('profiles')
-      .update({ is_verified: true, verification_status: 'approved' })
-      .eq('id', doc.user_id);
+    await updateProfileVerification(doc.user_id, { is_verified: true, verification_status: 'approved' });
   } else if (estado === 'rejected') {
-    await supabaseAdmin
-      .from('profiles')
-      .update({ verification_status: 'rejected' })
-      .eq('id', doc.user_id);
+    await updateProfileVerification(doc.user_id, { verification_status: 'rejected' });
   }
 
   return doc;
 }
 
+export async function getPendingHousings() {
+  const { data, error } = await findPendingHousings();
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return data;
+}
+
+export async function updateHousingStatus(housingId, { estado }) {
+  const { data, error } = await updateHousingStatusRecord(housingId, estado);
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return data;
+}
+
 export async function blockUser(userId, { motivo, dias }) {
   const blockedUntil = dias ? new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString() : null;
 
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ blocked_until: blockedUntil, blocked_reason: motivo })
-    .eq('id', userId);
+  const { error } = await updateProfileBlock(userId, { blockedUntil, motivo });
 
   if (error) {
     const err = new Error(error.message);

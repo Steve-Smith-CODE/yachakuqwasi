@@ -1,12 +1,16 @@
-import { stats, pendingDocuments, reviewDoc, block } from '../../../src/controllers/admin.controller.js';
+import { stats, pendingDocuments, reviewDoc, pendingHousings, reviewHousing, block } from '../../../src/controllers/admin.controller.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
 const createdDocIds = [];
+const createdListingIds = [];
 
 afterAll(async () => {
   for (const id of createdDocIds.splice(0)) {
     await supabaseAdmin.from('verification_documents').delete().eq('id', id).catch?.(() => {});
+  }
+  for (const id of createdListingIds.splice(0)) {
+    await supabaseAdmin.from('housing_listings').delete().eq('id', id).catch?.(() => {});
   }
   await cleanupCreatedUsers();
 });
@@ -59,6 +63,56 @@ describe('Admin Controller (Supabase local real)', () => {
 
     const body = res.json.mock.calls[0][0];
     expect(body.documento.status).toBe('approved');
+  });
+
+  it('pendingHousings responde con las habitaciones reales en estado pending', async () => {
+    const landlord = await createRealUser({ role: 'landlord' });
+    const { data: listing } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlord.id,
+        title: 'Habitacion pendiente controller',
+        price_pen: 250,
+        distance_to_unsch_minutes: 6,
+        neighborhood: 'San Blas',
+        address: 'Jr. Controller Pendiente 1',
+        contact_phone: '900000000',
+        status: 'pending'
+      })
+      .select()
+      .single();
+    createdListingIds.push(listing.id);
+
+    await pendingHousings(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.map((l) => l.id)).toContain(listing.id);
+  });
+
+  it('reviewHousing aprueba una habitacion real y envuelve el resultado en { listing }', async () => {
+    const landlord = await createRealUser({ role: 'landlord' });
+    const { data: listing } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlord.id,
+        title: 'Habitacion a aprobar controller',
+        price_pen: 250,
+        distance_to_unsch_minutes: 6,
+        neighborhood: 'San Blas',
+        address: 'Jr. Controller Aprobar 1',
+        contact_phone: '900000000',
+        status: 'pending'
+      })
+      .select()
+      .single();
+    createdListingIds.push(listing.id);
+
+    req.params.id = listing.id;
+    req.body = { estado: 'approved' };
+    await reviewHousing(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.listing.status).toBe('approved');
   });
 
   it('block bloquea a un usuario real y responde con el mensaje', async () => {

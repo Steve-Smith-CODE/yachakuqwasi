@@ -1,15 +1,47 @@
-import { getStats, getPendingDocuments, reviewDocument, blockUser } from '../../../src/services/admin.service.js';
+import {
+  getStats,
+  getPendingDocuments,
+  reviewDocument,
+  getPendingHousings,
+  updateHousingStatus,
+  blockUser
+} from '../../../src/services/admin.service.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
 const createdDocIds = [];
+const createdListingIds = [];
 
 afterAll(async () => {
   for (const id of createdDocIds.splice(0)) {
     await supabaseAdmin.from('verification_documents').delete().eq('id', id).catch?.(() => {});
   }
+  for (const id of createdListingIds.splice(0)) {
+    await supabaseAdmin.from('housing_listings').delete().eq('id', id).catch?.(() => {});
+  }
   await cleanupCreatedUsers();
 });
+
+async function insertPendingHousing(landlordId, overrides = {}) {
+  const { data, error } = await supabaseAdmin
+    .from('housing_listings')
+    .insert({
+      landlord_id: landlordId,
+      title: 'Habitacion pendiente de prueba',
+      price_pen: 200,
+      distance_to_unsch_minutes: 5,
+      neighborhood: 'San Blas',
+      address: 'Jr. Pendiente 1',
+      contact_phone: '900000000',
+      status: 'pending',
+      ...overrides
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  createdListingIds.push(data.id);
+  return data;
+}
 
 describe('Admin Service (Supabase local real)', () => {
   describe('getStats', () => {
@@ -67,6 +99,36 @@ describe('Admin Service (Supabase local real)', () => {
       const inexistente = '00000000-0000-0000-0000-000000000000';
 
       await expect(reviewDocument(inexistente, { estado: 'approved', comentario: 'x' })).rejects.toMatchObject({
+        statusCode: 400
+      });
+    });
+  });
+
+  describe('getPendingHousings + updateHousingStatus', () => {
+    it('lista una habitacion pendiente real y la aprueba', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await insertPendingHousing(landlord.id);
+
+      const pending = await getPendingHousings();
+      expect(pending.map((l) => l.id)).toContain(listing.id);
+
+      const approved = await updateHousingStatus(listing.id, { estado: 'approved' });
+      expect(approved.status).toBe('approved');
+
+      const { data: fetched } = await supabaseAdmin.from('housing_listings').select('*').eq('id', listing.id).single();
+      expect(fetched.status).toBe('approved');
+    });
+
+    it('marca una habitacion como flagged (rechazada)', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await insertPendingHousing(landlord.id);
+
+      const flagged = await updateHousingStatus(listing.id, { estado: 'flagged' });
+      expect(flagged.status).toBe('flagged');
+    });
+
+    it('lanza error con statusCode 400 si el id no es un uuid valido (error real de Postgres)', async () => {
+      await expect(updateHousingStatus('esto-no-es-un-uuid', { estado: 'approved' })).rejects.toMatchObject({
         statusCode: 400
       });
     });
