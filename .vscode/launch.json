@@ -1,0 +1,38 @@
+{
+    // Use IntelliSense para saber los atributos posibles.
+    // Mantenga el puntero para ver las descripciones de los existentes atributos.
+    // Para más información, visite: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Iniciar Chrome para localhost",
+            "url": "http://localhost:8080",
+            "webRoot": "${workspaceFolder}"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Jest: todas las pruebas (backend)",
+            "program": "${workspaceFolder}/backend/node_modules/jest/bin/jest.js",
+            "args": ["--config", "jest.config.cjs", "--runInBand"],
+            "cwd": "${workspaceFolder}/backend",
+            "env": { "NODE_ENV": "test" },
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Jest: archivo actual (backend)",
+            "program": "${workspaceFolder}/backend/node_modules/jest/bin/jest.js",
+            "args": ["--config", "jest.config.cjs", "--runInBand", "${fileBasenameNoExtension}"],
+            "cwd": "${workspaceFolder}/backend",
+            "env": { "NODE_ENV": "test" },
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "disableOptimisticBPs": true
+        }
+    ]
+}
