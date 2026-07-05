@@ -1,45 +1,93 @@
-# YachakuqWasi
+<div align="center">
 
-Portal de alojamiento estudiantil para la Universidad Nacional de San Cristóbal de Huamanga (UNSCH), en Ayacucho, Perú.
+# 🦅 YachakuqWasi
 
-## ¿Qué es esto?
+### Portal de alojamiento estudiantil — UNSCH, Ayacucho, Perú
 
-Una plataforma donde los estudiantes de la UNSCH pueden buscar cuartos, departamentos y casas para alquilar cerca de la universidad, y los arrendadores pueden publicar sus propiedades. Incluye un panel de administración para verificar publicaciones y usuarios.
+<p>
+<img src="https://img.shields.io/badge/status-en%20desarrollo-yellow?style=for-the-badge" alt="status" />
+<img src="https://img.shields.io/badge/tests-70%2F70%20passing-brightgreen?style=for-the-badge" alt="tests" />
+<img src="https://img.shields.io/badge/coverage-97.9%25-brightgreen?style=for-the-badge" alt="coverage" />
+</p>
 
-## Cómo está organizado el repositorio
+</div>
 
-- **`backend/`** — la API real (Node.js + Express), conectada a Supabase (base de datos y autenticación).
-- **`frontend/`** — el cliente web de la plataforma real (React + Vite).
-- **`supabase/`** — el esquema de la base de datos y las migraciones.
-- La carpeta raíz (`src/`, `server.ts`, etc.) contiene un prototipo aparte, hecho en Google AI Studio: un asistente virtual llamado **Maki** que responde preguntas sobre alquileres.
+---
 
-## Qué se hizo recientemente (resumen simple)
+## 📚 Sobre el proyecto
 
-Se revisó cómo estaba armado el backend y se reforzaron varias cosas para que la aplicación sea más segura y confiable:
+**YachakuqWasi** ("la casa que enseña", en quechua) conecta a estudiantes de la UNSCH con arrendadores de cuartos, departamentos y casas cerca de la Ciudad Universitaria, en Ayacucho. Los estudiantes buscan y filtran alojamientos; los arrendadores publican propiedades; un panel de administración verifica documentos y modera usuarios.
 
-1. **Se corrigió una clave secreta que estaba expuesta.** Un archivo de ejemplo tenía una clave real de la API de Gemini en vez de un texto de relleno. Ya se reemplazó por un placeholder.
-2. **Ahora la API revisa los datos antes de guardarlos.** Antes, si alguien mandaba datos incompletos o con el formato equivocado (por ejemplo, un precio que no es un número), el error podía llegar hasta la base de datos. Ahora se valida todo antes de procesarlo, con mensajes claros de qué está mal.
-3. **Los errores se manejan de forma ordenada.** Se creó un sistema único para lanzar y responder errores ("no encontrado", "no autorizado", "dato inválido"), en vez de que cada parte del código resuelva sus propios casos por separado.
-4. **Se agregó un registro (logs) más completo.** Cada petición que llega a la API ahora tiene un identificador único, así que si algo falla es más fácil rastrear exactamente qué pasó.
-5. **Se limitó cuántas peticiones puede hacer una misma persona en poco tiempo**, para evitar abusos o ataques automatizados.
-6. **Se separó el arranque del servidor de su configuración**, para poder probar la API sin necesidad de levantar un servidor real.
-7. **Se revisó que nada de esto rompiera lo que ya funcionaba:** los 70 tests automáticos del backend siguen pasando, con una cobertura de código de casi el 98%.
+El repositorio contiene dos aplicaciones:
 
-## Cómo correrlo localmente
+- 🏠 **La plataforma real** (`backend/` + `frontend/` + `supabase/`) — el marketplace en producción.
+- 🦅 **Un prototipo** (raíz del repo) hecho en Google AI Studio: **Maki**, un asistente virtual (halcón mascota) que responde preguntas sobre alquileres con IA generativa.
+
+---
+
+## 🗂️ Estructura del repositorio
+
+| Carpeta | Contenido |
+|---|---|
+| `backend/` | API REST (Node.js + Express), autenticación y datos vía Supabase |
+| `frontend/` | Cliente web de la plataforma real (React + Vite) |
+| `supabase/` | Esquema de base de datos y migraciones (Supabase CLI) |
+| `src/`, `server.ts` | Prototipo del asistente Maki (Vite + React + Gemini API) |
+
+---
+
+## ✅ Fase 1 — Endurecimiento del backend
+
+Se revisó el backend y se reforzaron varios puntos de seguridad y calidad, explicados en simple:
+
+- 🔑 **Se corrigió una clave secreta expuesta** — un archivo de ejemplo tenía una API key real en vez de un placeholder.
+- 🛡️ **La API ahora valida los datos antes de guardarlos** — si algo llega incompleto o mal formado, se rechaza con un mensaje claro, antes de tocar la base de datos.
+- 🚦 **Los errores se manejan de forma centralizada y consistente** — un solo sistema para "no encontrado", "no autorizado", "dato inválido", etc.
+- 📝 **Cada petición queda registrada con un identificador único**, para poder rastrear qué pasó si algo falla.
+- ⏱️ **Se limita cuántas peticiones puede hacer una misma persona en poco tiempo**, para evitar abusos.
+- 🧩 **Se separó el arranque del servidor de su configuración**, para poder testear la API sin levantar un puerto real.
+- 🧪 **Todo esto sin romper nada:** los 70 tests automáticos del backend siguen pasando, con ~98% de cobertura de código.
+
+---
+
+## 🛠️ Tecnologías
+
+<p align="left">
+<img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
+<img src="https://img.shields.io/badge/Express-000000?style=for-the-badge&logo=express&logoColor=white" alt="Express" />
+<img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+<img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+<img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
+<img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+<img src="https://img.shields.io/badge/Zod-3E67B1?style=for-the-badge&logo=zod&logoColor=white" alt="Zod" />
+<img src="https://img.shields.io/badge/Jest-C21325?style=for-the-badge&logo=jest&logoColor=white" alt="Jest" />
+</p>
+
+---
+
+## ⚙️ Cómo correrlo localmente
 
 ```bash
 npm run local:install-all   # instala dependencias de raíz, backend y frontend
 npm run local:dev           # levanta backend y frontend juntos
 ```
 
-El backend necesita un archivo `.env` propio (copia `backend/.env.example` y complétalo con tus credenciales de Supabase). Lo mismo aplica para `frontend/.env`.
+El backend necesita un archivo `.env` propio (copia `backend/.env.example` y complétalo con tus credenciales de Supabase). Lo mismo para `frontend/.env`.
 
-## Stack técnico
-
-- **Backend:** Node.js, Express, Supabase (Postgres + Auth), Zod, Jest
-- **Frontend:** React, Vite
-- **Base de datos:** PostgreSQL vía Supabase, con Row Level Security
+```bash
+cd backend && npm test      # corre la suite completa con cobertura
+```
 
 ---
 
-Proyecto académico — Ingeniería de Sistemas, UNSCH.
+## 🎓 Contexto académico
+
+- 🏫 **Universidad:** Universidad Nacional de San Cristóbal de Huamanga (UNSCH)
+- 🎓 **Escuela Profesional:** Ingeniería de Sistemas
+- 📖 **Curso:** IS-489
+
+---
+
+<p align="center">
+<i>🦅 Desarrollado por <a href="https://github.com/Steve-Smith-CODE">@Steve-Smith-CODE</a> — Proyecto académico, UNSCH</i>
+</p>
