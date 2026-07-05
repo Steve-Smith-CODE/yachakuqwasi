@@ -1,5 +1,5 @@
 import request from 'supertest';
-import app from '../../src/server.js';
+import app from '../../src/app.js';
 import { supabaseAdmin } from '../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../helpers/testData.js';
 
@@ -57,6 +57,25 @@ describe('Housing Integration (Supabase local real)', () => {
     const res = await request(app).post('/api/housings').send({ title: 'Sin token' });
 
     expect(res.status).toBe(401);
+  });
+
+  it('debe rechazar la publicacion si el body no cumple el esquema (falta address)', async () => {
+    const landlord = await createRealUser({ role: 'landlord' });
+    const token = await loginAndGetToken(landlord);
+
+    const res = await request(app)
+      .post('/api/housings')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Sin direccion',
+        pricePen: 100,
+        distanceToUnschMinutes: 5,
+        neighborhood: 'Belén',
+        contactPhone: '900000000'
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty('details');
   });
 
   it('debe listar alojamientos aprobados reales con filtros, sin requerir autenticacion', async () => {

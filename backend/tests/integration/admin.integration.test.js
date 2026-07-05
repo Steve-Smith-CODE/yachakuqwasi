@@ -1,5 +1,5 @@
 import request from 'supertest';
-import app from '../../src/server.js';
+import app from '../../src/app.js';
 import { supabaseAdmin } from '../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../helpers/testData.js';
 
@@ -79,6 +79,38 @@ describe('Admin Integration (Supabase local real)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('Usuario bloqueado');
+  });
+
+  it('debe rechazar la revision de documento si "estado" no es approved/rejected', async () => {
+    const admin = await createRealUser({ role: 'admin' });
+    const token = await loginAndGetToken(admin);
+    const student = await createRealUser({ role: 'student' });
+    const { data: doc } = await supabaseAdmin
+      .from('verification_documents')
+      .insert({ user_id: student.id, doc_url: 'https://example.com/z.png', status: 'pending' })
+      .select()
+      .single();
+    createdDocIds.push(doc.id);
+
+    const res = await request(app)
+      .put(`/api/admin/documentos/${doc.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ estado: 'no-es-un-estado-valido' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('debe rechazar el bloqueo de usuario si falta el motivo', async () => {
+    const admin = await createRealUser({ role: 'admin' });
+    const token = await loginAndGetToken(admin);
+    const student = await createRealUser({ role: 'student' });
+
+    const res = await request(app)
+      .put(`/api/admin/usuarios/${student.id}/bloquear`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dias: 7 });
+
+    expect(res.status).toBe(400);
   });
 
   it('debe rechazar el acceso si el usuario autenticado no es admin', async () => {

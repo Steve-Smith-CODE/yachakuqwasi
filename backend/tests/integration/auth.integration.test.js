@@ -1,5 +1,5 @@
 import request from 'supertest';
-import app from '../../src/server.js';
+import app from '../../src/app.js';
 import { createRealUser, cleanupCreatedUsers, trackUserForCleanup, uniqueEmail } from '../helpers/testData.js';
 
 afterAll(async () => {

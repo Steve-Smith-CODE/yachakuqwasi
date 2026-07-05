@@ -8,10 +8,16 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
+const RESERVED_KEYS = new Set(['level', 'message', 'timestamp']);
+
 const format = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DDTHH:mm:ss.SSSZ' }),
   winston.format.printf((info) => {
-    return '[' + info.timestamp + '] ' + info.level + ': ' + info.message;
+    const meta = Object.keys(info).filter((key) => !RESERVED_KEYS.has(key));
+    const metaStr = meta.length
+      ? ' ' + JSON.stringify(Object.fromEntries(meta.map((key) => [key, info[key]])))
+      : '';
+    return '[' + info.timestamp + '] ' + info.level + ': ' + info.message + metaStr;
   })
 );
 

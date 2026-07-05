@@ -8,6 +8,7 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/server.js',
+    '!src/app.js',
     '!src/config/**/*.js',
     '!src/models/index.js',
     '!src/migrations/**',

@@ -24,7 +24,10 @@ describe('Error Handler Middleware', () => {
 
     errorHandler(err, req, res, next);
 
-    expect(logger.error).toHaveBeenCalledWith('stack-trace');
+    expect(logger.error).toHaveBeenCalledWith(
+      'stack-trace',
+      expect.objectContaining({ statusCode: 404, stack: 'stack-trace' })
+    );
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: 'Recurso no encontrado', status: 404 });
   });
@@ -34,7 +37,7 @@ describe('Error Handler Middleware', () => {
 
     errorHandler(err, req, res, next);
 
-    expect(logger.error).toHaveBeenCalledWith(undefined);
+    expect(logger.error).toHaveBeenCalledWith(undefined, expect.objectContaining({ statusCode: 500 }));
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: 'Error interno del servidor', status: 500 });
   });
@@ -45,6 +48,40 @@ describe('Error Handler Middleware', () => {
 
     errorHandler(err, req, res, next);
 
-    expect(logger.error).toHaveBeenCalledWith('Fallo puntual');
+    expect(logger.error).toHaveBeenCalledWith('Fallo puntual', expect.any(Object));
+  });
+
+  it('debe incluir el requestId en el log cuando req.id esta presente', () => {
+    const err = { statusCode: 400, message: 'Dato invalido' };
+    req.id = 'req-123';
+    req.path = '/api/test';
+
+    errorHandler(err, req, res, next);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Dato invalido',
+      expect.objectContaining({ requestId: 'req-123', path: '/api/test' })
+    );
+  });
+
+  it('debe incluir details en la respuesta cuando el error los trae (p. ej. ValidationError)', () => {
+    const err = { statusCode: 400, message: 'Validación fallida', details: { fieldErrors: { email: ['Email inválido'] } } };
+
+    errorHandler(err, req, res, next);
+
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Validación fallida',
+      status: 400,
+      details: { fieldErrors: { email: ['Email inválido'] } }
+    });
+  });
+
+  it('no expone el stack en el log cuando el error es operacional (isOperational)', () => {
+    const err = { statusCode: 400, message: 'Operacional', stack: 'stack-secreto', isOperational: true };
+
+    errorHandler(err, req, res, next);
+
+    const [, meta] = logger.error.mock.calls[0];
+    expect(meta.stack).toBeUndefined();
   });
 });
