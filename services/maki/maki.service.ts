@@ -53,11 +53,19 @@ export class MakiService {
 
     const result = (await tool.execute(call.args ?? {})) as Record<string, unknown>;
 
+    // Se reutilizan las partes reales devueltas por el modelo (incluyen
+    // thoughtSignature cuando el modelo la genera) en vez de reconstruir el
+    // functionCall a mano: la API de Gemini rechaza un turno de modelo con
+    // functionCall sin esa firma ("thought_signature") en modelos recientes.
+    const modelParts = response.candidates?.[0]?.content?.parts ?? [
+      createPartFromFunctionCall(call.name, call.args ?? {}),
+    ];
+
     const followUp = await this.ai.models.generateContent({
       model: MODEL,
       contents: [
         createUserContent(prompt),
-        createModelContent([createPartFromFunctionCall(call.name, call.args ?? {})]),
+        createModelContent(modelParts),
         createUserContent([createPartFromFunctionResponse(call.id ?? call.name, call.name, result)]),
       ],
       config: { systemInstruction, temperature: 0.7 },
