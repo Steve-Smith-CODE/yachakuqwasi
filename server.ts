@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
 import { MakiService } from "./services/maki/maki.service.js";
+import { GroqMakiService } from "./services/maki/providers/groq.provider.js";
 
 dotenv.config();
 
@@ -33,14 +34,43 @@ async function startServer() {
     return ai;
   }
 
-  // Maki desacoplado del proveedor de IA: usa MakiService + tools.ts, que
-  // puede llamar al backend real (GET /api/housings) via function-calling.
-  let maki: MakiService | null = null;
-  function getMaki() {
+  // Maki desacoplado del proveedor de IA: MakiService (Gemini) y
+  // GroqMakiService comparten la misma interfaz publica chat(prompt, systemInstruction),
+  // asi que server.ts puede intercambiar de proveedor sin tocar la logica
+  // de negocio ni las tools (services/maki/tools.ts).
+  type MakiProvider = { chat(prompt: string, systemInstruction: string): Promise<string> };
+  let maki: MakiProvider | null = null;
+
+  function getMaki(): MakiProvider | null {
+    if (maki) return maki;
+
+    const requested = (process.env.AI_PROVIDER || "").toLowerCase();
+    const groqKey = process.env.GROQ_API_KEY;
+
+    if (requested === "groq" && groqKey) {
+      maki = new GroqMakiService(groqKey);
+      return maki;
+    }
+    if (requested === "gemini") {
+      const gemini = getGemini();
+      if (gemini) {
+        maki = new MakiService(gemini);
+        return maki;
+      }
+    }
+
+    // Sin AI_PROVIDER explicito: Groq primero (mas rapido) si hay key,
+    // luego Gemini, luego modo simulado.
+    if (groqKey) {
+      maki = new GroqMakiService(groqKey);
+      return maki;
+    }
     const gemini = getGemini();
-    if (!gemini) return null;
-    if (!maki) maki = new MakiService(gemini);
-    return maki;
+    if (gemini) {
+      maki = new MakiService(gemini);
+      return maki;
+    }
+    return null;
   }
 
   // API Route for chatting with Maki the mascot
