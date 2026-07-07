@@ -1,11 +1,26 @@
 import { supabaseAdmin } from '../config/supabase.js';
 
+const DEFAULT_LIMIT = 24;
+const MAX_LIMIT = 100;
+
 export function insertHousing(record) {
   return supabaseAdmin.from('housing_listings').insert(record).select().single();
 }
 
-export function findApprovedHousings({ tipo, precioMax, barrio } = {}) {
-  let query = supabaseAdmin.from('housing_listings').select('*').eq('status', 'approved');
+// Paginado via .range(): sin esto, un listado approved que crezca trae todas
+// las filas en cada request (era el principal cuello de botella de /housings).
+export function findApprovedHousings({ tipo, precioMax, barrio, page = 1, limit = DEFAULT_LIMIT } = {}) {
+  const safeLimit = Math.min(Number(limit) || DEFAULT_LIMIT, MAX_LIMIT);
+  const safePage = Math.max(Number(page) || 1, 1);
+  const from = (safePage - 1) * safeLimit;
+  const to = from + safeLimit - 1;
+
+  let query = supabaseAdmin
+    .from('housing_listings')
+    .select('*')
+    .eq('status', 'approved')
+    .order('created_at', { ascending: false })
+    .range(from, to);
 
   if (tipo) query = query.eq('type', tipo);
   if (precioMax) query = query.lte('price_pen', Number(precioMax));
@@ -16,6 +31,14 @@ export function findApprovedHousings({ tipo, precioMax, barrio } = {}) {
 
 export function findHousingById(id) {
   return supabaseAdmin.from('housing_listings').select('*').eq('id', id).single();
+}
+
+export function findHousingsByLandlord(landlordId) {
+  return supabaseAdmin
+    .from('housing_listings')
+    .select('*')
+    .eq('landlord_id', landlordId)
+    .order('created_at', { ascending: false });
 }
 
 export function updateHousingImages(id, images) {

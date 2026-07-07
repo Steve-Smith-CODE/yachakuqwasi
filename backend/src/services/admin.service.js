@@ -7,7 +7,12 @@ import {
   updateProfileVerification,
   findPendingHousings,
   updateHousingStatusRecord,
-  updateProfileBlock
+  updateProfileBlock,
+  findAllHousingsAdmin,
+  findAllProfiles,
+  updateProfileRole,
+  insertAuditLog,
+  findAuditLogs
 } from '../repositories/admin.repository.js';
 
 export async function getStats() {
@@ -36,7 +41,7 @@ export async function getPendingDocuments() {
   return data;
 }
 
-export async function reviewDocument(docId, { estado, comentario }) {
+export async function reviewDocument(docId, { estado, comentario }, actor) {
   const { data: doc, error } = await updateDocumentStatus(docId, { status: estado, comment: comentario });
 
   if (error) {
@@ -50,6 +55,14 @@ export async function reviewDocument(docId, { estado, comentario }) {
   } else if (estado === 'rejected') {
     await updateProfileVerification(doc.user_id, { verification_status: 'rejected' });
   }
+
+  await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: estado === 'approved' ? 'Aprobó credencial' : 'Rechazó credencial',
+    details: `Documento ${docId} marcado como ${estado}.`,
+    type: 'user'
+  });
 
   return doc;
 }
@@ -66,7 +79,7 @@ export async function getPendingHousings() {
   return data;
 }
 
-export async function updateHousingStatus(housingId, { estado }) {
+export async function updateHousingStatus(housingId, { estado }, actor) {
   const { data, error } = await updateHousingStatusRecord(housingId, estado);
 
   if (error) {
@@ -75,10 +88,18 @@ export async function updateHousingStatus(housingId, { estado }) {
     throw err;
   }
 
+  await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: `Moderar anuncio: ${estado}`,
+    details: `Anuncio '${data?.title ?? housingId}' cambiado a estado '${estado}'.`,
+    type: 'listing'
+  });
+
   return data;
 }
 
-export async function blockUser(userId, { motivo, dias }) {
+export async function blockUser(userId, { motivo, dias }, actor) {
   const blockedUntil = dias ? new Date(Date.now() + dias * 24 * 60 * 60 * 1000).toISOString() : null;
 
   const { error } = await updateProfileBlock(userId, { blockedUntil, motivo });
@@ -89,5 +110,69 @@ export async function blockUser(userId, { motivo, dias }) {
     throw err;
   }
 
+  await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: 'Bloqueó usuario',
+    details: `Usuario ${userId} bloqueado. Motivo: ${motivo}`,
+    type: 'user'
+  });
+
   return { message: 'Usuario bloqueado' };
+}
+
+export async function getAllHousingsAdmin() {
+  const { data, error } = await findAllHousingsAdmin();
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return data;
+}
+
+export async function getAllUsers() {
+  const { data, error } = await findAllProfiles();
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return data;
+}
+
+export async function setUserRole(userId, role, actor) {
+  const { data, error } = await updateProfileRole(userId, role);
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: 'Cambio de rol',
+    details: `Usuario ${userId} actualizado al rol '${role}'.`,
+    type: 'user'
+  });
+
+  return data;
+}
+
+export async function getAuditLogs() {
+  const { data, error } = await findAuditLogs();
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return data;
 }

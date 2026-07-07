@@ -55,4 +55,35 @@ describe('geocoding.service', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
+
+  it('usa el User-Agent por defecto cuando NOMINATIM_USER_AGENT no esta definida', async () => {
+    const originalUserAgent = process.env.NOMINATIM_USER_AGENT;
+    delete process.env.NOMINATIM_USER_AGENT;
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ lat: '-13.1', lon: '-74.2' }]
+    });
+
+    try {
+      await geocode('Jr. Sin User Agent 1');
+      const [, options] = global.fetch.mock.calls[0];
+      expect(options.headers['User-Agent']).toBe('yachakuqwasi-dev');
+    } finally {
+      process.env.NOMINATIM_USER_AGENT = originalUserAgent;
+    }
+  });
+
+  it('devuelve resultado del cache en segunda llamada con misma direccion', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ lat: '-13.2', lon: '-74.3' }]
+    });
+
+    const first = await geocode('Jr. Cache Test');
+    const second = await geocode('Jr. Cache Test');
+
+    expect(first).toEqual(second);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
 });

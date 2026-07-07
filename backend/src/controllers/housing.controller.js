@@ -1,4 +1,4 @@
-import { createHousing, listHousings, addHousingImages } from '../services/housing.service.js';
+import { createHousing, listHousings, addHousingImages, listMyHousings } from '../services/housing.service.js';
 
 export async function create(req, res) {
   const listing = await createHousing(req.user.id, req.body);
@@ -11,7 +11,12 @@ export async function uploadImages(req, res) {
 }
 
 export async function list(req, res) {
-  const { tipo, precio_max, barrio } = req.query;
-  const listings = await listHousings({ tipo, precioMax: precio_max, barrio });
+  const { tipo, precio_max, barrio, page, limit } = req.query;
+  const listings = await listHousings({ tipo, precioMax: precio_max, barrio, page, limit });
+  res.json(listings);
+}
+
+export async function mine(req, res) {
+  const listings = await listMyHousings(req.user.id);
   res.json(listings);
 }

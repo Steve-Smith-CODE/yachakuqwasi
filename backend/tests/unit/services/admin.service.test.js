@@ -4,8 +4,13 @@ import {
   reviewDocument,
   getPendingHousings,
   updateHousingStatus,
-  blockUser
+  blockUser,
+  getAllHousingsAdmin,
+  getAllUsers,
+  setUserRole,
+  getAuditLogs
 } from '../../../src/services/admin.service.js';
+import * as adminRepo from '../../../src/repositories/admin.repository.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -53,6 +58,24 @@ describe('Admin Service (Supabase local real)', () => {
       const after = await getStats();
 
       expect(after.totalUsers).toBe(before.totalUsers + 1);
+    });
+
+    it('usa 0 por defecto si algun conteo viene null/undefined', async () => {
+      const originalCountProfiles = adminRepo.countProfiles;
+      const originalCountHousings = adminRepo.countHousings;
+      const originalCountPending = adminRepo.countPendingDocuments;
+      adminRepo.countProfiles = jest.fn().mockResolvedValue({ count: null });
+      adminRepo.countHousings = jest.fn().mockResolvedValue({ count: undefined });
+      adminRepo.countPendingDocuments = jest.fn().mockResolvedValue({ count: null });
+
+      try {
+        const stats = await getStats();
+        expect(stats).toEqual({ totalUsers: 0, totalHousings: 0, pendingDocuments: 0 });
+      } finally {
+        adminRepo.countProfiles = originalCountProfiles;
+        adminRepo.countHousings = originalCountHousings;
+        adminRepo.countPendingDocuments = originalCountPending;
+      }
     });
   });
 
@@ -102,6 +125,25 @@ describe('Admin Service (Supabase local real)', () => {
         statusCode: 400
       });
     });
+
+    it('no actualiza verification_status si estado no es approved ni rejected', async () => {
+      const originalUpdateDoc = adminRepo.updateDocumentStatus;
+      const originalUpdateVerif = adminRepo.updateProfileVerification;
+      adminRepo.updateDocumentStatus = jest.fn().mockResolvedValue({
+        data: { id: 'fake-doc', user_id: 'fake-user' },
+        error: null
+      });
+      adminRepo.updateProfileVerification = jest.fn();
+
+      try {
+        const result = await reviewDocument('fake-doc', { estado: 'otro-estado' });
+        expect(result.id).toBe('fake-doc');
+        expect(adminRepo.updateProfileVerification).not.toHaveBeenCalled();
+      } finally {
+        adminRepo.updateDocumentStatus = originalUpdateDoc;
+        adminRepo.updateProfileVerification = originalUpdateVerif;
+      }
+    });
   });
 
   describe('getPendingHousings + updateHousingStatus', () => {
@@ -132,6 +174,21 @@ describe('Admin Service (Supabase local real)', () => {
         statusCode: 400
       });
     });
+
+    it('usa el housingId en los detalles del log si el repositorio no devuelve datos', async () => {
+      const originalFn = adminRepo.updateHousingStatusRecord;
+      adminRepo.updateHousingStatusRecord = jest.fn().mockResolvedValue({ data: null, error: null });
+
+      try {
+        const result = await updateHousingStatus('fake-housing-id', { estado: 'approved' });
+        expect(result).toBeNull();
+
+        const logs = await getAuditLogs();
+        expect(logs.some((l) => l.details?.includes('fake-housing-id'))).toBe(true);
+      } finally {
+        adminRepo.updateHousingStatusRecord = originalFn;
+      }
+    });
   });
 
   describe('blockUser', () => {
@@ -146,10 +203,165 @@ describe('Admin Service (Supabase local real)', () => {
       expect(profile.blocked_until).toBeTruthy();
     });
 
+    it('bloquea a un usuario real de forma permanente cuando no se especifican dias', async () => {
+      const student = await createRealUser({ role: 'student' });
+
+      const result = await blockUser(student.id, { motivo: 'Spam permanente', dias: null });
+      expect(result).toEqual({ message: 'Usuario bloqueado' });
+
+      const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
+      expect(profile.blocked_reason).toBe('Spam permanente');
+      expect(profile.blocked_until).toBeNull();
+    });
+
     it('lanza error con statusCode 400 si el id no es un uuid valido (error real de Postgres)', async () => {
       await expect(blockUser('esto-no-es-un-uuid', { motivo: 'x', dias: 1 })).rejects.toMatchObject({
         statusCode: 400
       });
+    });
+  });
+
+  describe('reviewDocument - Estado Rejected', () => {
+    it('rechaza un documento y deja al usuario sin verificar', async () => {
+      const student = await createRealUser({ role: 'student' });
+
+      const { data: doc } = await supabaseAdmin
+        .from('verification_documents')
+        .insert({ user_id: student.id, doc_url: 'https://example.com/invalido.png', status: 'pending' })
+        .select()
+        .single();
+      createdDocIds.push(doc.id);
+
+      const reviewed = await reviewDocument(doc.id, { estado: 'rejected', comentario: 'Documento borroso' });
+      expect(reviewed.status).toBe('rejected');
+
+      const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
+      expect(profile.verification_status).toBe('rejected');
+      expect(profile.is_verified).toBe(false);
+    });
+  });
+
+  describe('getPendingDocuments - Error Cases', () => {
+    it('maneja error cuando falla la consulta de documentos', async () => {
+      // Mock para forzar error en el repositorio
+      const originalFn = adminRepo.findPendingDocuments;
+      adminRepo.findPendingDocuments = jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Database connection failed' }
+      });
+
+      try {
+        await expect(getPendingDocuments()).rejects.toMatchObject({
+          statusCode: 500
+        });
+      } finally {
+        adminRepo.findPendingDocuments = originalFn;
+      }
+    });
+  });
+
+  describe('getPendingHousings - Error Cases', () => {
+    it('maneja error cuando falla la consulta de housing pendientes', async () => {
+      // Mock para forzar error en el repositorio
+      const originalFn = adminRepo.findPendingHousings;
+      adminRepo.findPendingHousings = jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Database connection failed' }
+      });
+
+      try {
+        await expect(getPendingHousings()).rejects.toMatchObject({
+          statusCode: 500
+        });
+      } finally {
+        adminRepo.findPendingHousings = originalFn;
+      }
+    });
+  });
+
+  describe('getAllHousingsAdmin', () => {
+    it('devuelve todas las publicaciones reales (cualquier estado)', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await insertPendingHousing(landlord.id, { title: 'Para listado admin' });
+
+      const all = await getAllHousingsAdmin();
+
+      expect(all.map((l) => l.id)).toContain(listing.id);
+    });
+
+    it('lanza error con statusCode 500 si el repositorio falla', async () => {
+      const originalFn = adminRepo.findAllHousingsAdmin;
+      adminRepo.findAllHousingsAdmin = jest.fn().mockResolvedValue({ data: null, error: { message: 'fail' } });
+
+      try {
+        await expect(getAllHousingsAdmin()).rejects.toMatchObject({ statusCode: 500 });
+      } finally {
+        adminRepo.findAllHousingsAdmin = originalFn;
+      }
+    });
+  });
+
+  describe('getAllUsers', () => {
+    it('devuelve todos los perfiles reales', async () => {
+      const student = await createRealUser({ role: 'student' });
+
+      const all = await getAllUsers();
+
+      expect(all.map((u) => u.id)).toContain(student.id);
+    });
+
+    it('lanza error con statusCode 500 si el repositorio falla', async () => {
+      const originalFn = adminRepo.findAllProfiles;
+      adminRepo.findAllProfiles = jest.fn().mockResolvedValue({ data: null, error: { message: 'fail' } });
+
+      try {
+        await expect(getAllUsers()).rejects.toMatchObject({ statusCode: 500 });
+      } finally {
+        adminRepo.findAllProfiles = originalFn;
+      }
+    });
+  });
+
+  describe('setUserRole', () => {
+    it('actualiza el rol real de un usuario', async () => {
+      const student = await createRealUser({ role: 'student' });
+
+      const updated = await setUserRole(student.id, 'landlord');
+
+      expect(updated.role).toBe('landlord');
+    });
+
+    it('lanza error con statusCode 400 si el id no es un uuid valido (error real de Postgres)', async () => {
+      await expect(setUserRole('esto-no-es-un-uuid', 'landlord')).rejects.toMatchObject({ statusCode: 400 });
+    });
+  });
+
+  describe('getAuditLogs', () => {
+    it('devuelve el log real generado al aprobar un documento', async () => {
+      const student = await createRealUser({ role: 'student' });
+      const { data: doc } = await supabaseAdmin
+        .from('verification_documents')
+        .insert({ user_id: student.id, doc_url: 'https://example.com/audit.png', status: 'pending' })
+        .select()
+        .single();
+      createdDocIds.push(doc.id);
+
+      await reviewDocument(doc.id, { estado: 'approved', comentario: 'ok' }, { id: student.id, name: 'Admin Test' });
+
+      const logs = await getAuditLogs();
+
+      expect(logs.some((l) => l.details?.includes(doc.id))).toBe(true);
+    });
+
+    it('lanza error con statusCode 500 si el repositorio falla', async () => {
+      const originalFn = adminRepo.findAuditLogs;
+      adminRepo.findAuditLogs = jest.fn().mockResolvedValue({ data: null, error: { message: 'fail' } });
+
+      try {
+        await expect(getAuditLogs()).rejects.toMatchObject({ statusCode: 500 });
+      } finally {
+        adminRepo.findAuditLogs = originalFn;
+      }
     });
   });
 });

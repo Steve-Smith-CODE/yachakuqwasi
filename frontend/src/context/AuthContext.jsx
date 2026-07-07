@@ -15,6 +15,15 @@ function loadStoredAuth() {
 
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState(loadStoredAuth);
+  const [authModal, setAuthModal] = useState({ open: false, mode: "login" });
+
+  function openAuthModal(mode = "login") {
+    setAuthModal({ open: true, mode });
+  }
+
+  function closeAuthModal() {
+    setAuthModal((prev) => ({ ...prev, open: false }));
+  }
 
   async function login(email, password) {
     const result = await loginRequest({ email, password });
@@ -39,7 +48,10 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(auth?.token),
     login,
     register,
-    logout
+    logout,
+    authModal,
+    openAuthModal,
+    closeAuthModal
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,5 @@
 import { startChat, listChatsForUser, getMessages, sendMessage } from '../../../src/services/chat.service.js';
+import * as chatRepo from '../../../src/repositories/chat.repository.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -129,5 +130,103 @@ describe('Chat Service (Supabase local real)', () => {
     await expect(sendMessage(chat.id, { id: admin.id, role: 'admin' }, 'hola')).rejects.toMatchObject({
       statusCode: 403
     });
+  });
+
+  it('lista chats vacio para un usuario sin chats', async () => {
+    const newStudent = await createRealUser({ role: 'student' });
+    const chats = await listChatsForUser(newStudent.id, 'student');
+    expect(Array.isArray(chats)).toBe(true);
+  });
+
+  it('envia mensaje y actualiza el last_message del chat', async () => {
+    const student = await createRealUser({ role: 'student' });
+    const landlord = await createRealUser({ role: 'landlord' });
+    const listing = await createListing(landlord.id);
+    const chat = await startChat(student.id, { landlordId: landlord.id, listingId: listing.id });
+    createdChatIds.push(chat.id);
+
+    const messageText = 'Mensaje de prueba';
+    await sendMessage(chat.id, { id: student.id, role: 'student' }, messageText);
+
+    const { data: updatedChat } = await supabaseAdmin
+      .from('chats')
+      .select('last_message')
+      .eq('id', chat.id)
+      .single();
+
+    expect(updatedChat.last_message).toBe(messageText);
+  });
+
+  it('lanza 403 Forbidden si usuario intenta enviar mensaje en chat donde no participa', async () => {
+    const student = await createRealUser({ role: 'student' });
+    const landlord = await createRealUser({ role: 'landlord' });
+    const intruso = await createRealUser({ role: 'student' });
+    const listing = await createListing(landlord.id);
+    const chat = await startChat(student.id, { landlordId: landlord.id, listingId: listing.id });
+    createdChatIds.push(chat.id);
+
+    await expect(
+      sendMessage(chat.id, { id: intruso.id, role: 'student' }, 'Soy intruso')
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('lanza error 500 cuando listChatsForUser falla', async () => {
+    const originalFn = chatRepo.findChatsForUser;
+    chatRepo.findChatsForUser = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Database error' }
+    });
+
+    try {
+      await expect(listChatsForUser('test-user-id', 'student')).rejects.toMatchObject({
+        statusCode: 500
+      });
+    } finally {
+      chatRepo.findChatsForUser = originalFn;
+    }
+  });
+
+  it('lanza error 500 cuando getMessages falla al buscar los mensajes', async () => {
+    const student = await createRealUser({ role: 'student' });
+    const landlord = await createRealUser({ role: 'landlord' });
+    const listing = await createListing(landlord.id);
+    const chat = await startChat(student.id, { landlordId: landlord.id, listingId: listing.id });
+    createdChatIds.push(chat.id);
+
+    const originalFn = chatRepo.findMessagesByChat;
+    chatRepo.findMessagesByChat = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Database error' }
+    });
+
+    try {
+      await expect(getMessages(chat.id, { id: student.id, role: 'student' })).rejects.toMatchObject({
+        statusCode: 500
+      });
+    } finally {
+      chatRepo.findMessagesByChat = originalFn;
+    }
+  });
+
+  it('lanza error 400 cuando sendMessage falla al insertar el mensaje', async () => {
+    const student = await createRealUser({ role: 'student' });
+    const landlord = await createRealUser({ role: 'landlord' });
+    const listing = await createListing(landlord.id);
+    const chat = await startChat(student.id, { landlordId: landlord.id, listingId: listing.id });
+    createdChatIds.push(chat.id);
+
+    const originalFn = chatRepo.insertMessage;
+    chatRepo.insertMessage = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Storage limit exceeded' }
+    });
+
+    try {
+      await expect(sendMessage(chat.id, { id: student.id, role: 'student' }, 'test')).rejects.toMatchObject({
+        statusCode: 400
+      });
+    } finally {
+      chatRepo.insertMessage = originalFn;
+    }
   });
 });

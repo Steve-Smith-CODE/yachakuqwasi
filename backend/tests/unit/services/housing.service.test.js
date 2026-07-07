@@ -1,4 +1,5 @@
-import { createHousing, listHousings } from '../../../src/services/housing.service.js';
+import { createHousing, listHousings, listMyHousings, addHousingImages } from '../../../src/services/housing.service.js';
+import * as housingRepo from '../../../src/repositories/housing.repository.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -135,6 +136,172 @@ describe('Housing Service (Supabase local real)', () => {
 
     it('lanza error con statusCode 500 si el tipo no es un valor valido del enum (error real de Postgres)', async () => {
       await expect(listHousings({ tipo: 'no-existe-este-tipo' })).rejects.toMatchObject({ statusCode: 500 });
+    });
+
+    it('usa {} por defecto cuando se llama sin argumentos', async () => {
+      const result = await listHousings();
+      expect(Array.isArray(result)).toBe(true);
+    });
+  });
+
+  describe('listMyHousings', () => {
+    it('devuelve solo las publicaciones reales del arrendador indicado', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await createHousing(landlord.id, {
+        title: 'Mia real',
+        pricePen: 250,
+        distanceToUnschMinutes: 8,
+        neighborhood: 'San Blas',
+        address: 'Jr. Mia 1',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      const result = await listMyHousings(landlord.id);
+
+      expect(result.map((l) => l.id)).toContain(listing.id);
+    });
+
+    it('lanza error con statusCode 500 si el repositorio falla', async () => {
+      const originalFn = housingRepo.findHousingsByLandlord;
+      housingRepo.findHousingsByLandlord = jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Database connection failed' }
+      });
+
+      try {
+        await expect(listMyHousings('cualquier-id')).rejects.toMatchObject({ statusCode: 500 });
+      } finally {
+        housingRepo.findHousingsByLandlord = originalFn;
+      }
+    });
+  });
+
+  describe('addHousingImages', () => {
+    it('agrega imagenes a una publicacion como landlord propietario', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+
+      const listing = await createHousing(landlord.id, {
+        title: 'Habitacion para imagenes',
+        pricePen: 250,
+        distanceToUnschMinutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. Imagenes 123',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      // Mock de imagen base64 (PNG minimo)
+      const TINY_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+      const updated = await addHousingImages(listing.id, { id: landlord.id, role: 'landlord' }, [TINY_IMAGE]);
+
+      expect(updated.images).toBeDefined();
+      expect(Array.isArray(updated.images)).toBe(true);
+    });
+
+    it('lanza error 404 si la publicacion no existe', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const fakeId = '00000000-0000-0000-0000-000000000000';
+
+      await expect(
+        addHousingImages(fakeId, { id: landlord.id, role: 'landlord' }, ['data:image/png;base64,...'])
+      ).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('lanza error 403 si el usuario no es propietario ni admin', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const otherStudent = await createRealUser({ role: 'student' });
+
+      const listing = await createHousing(landlord.id, {
+        title: 'Habitacion sin permiso',
+        pricePen: 250,
+        distanceToUnschMinutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. SinPermiso 123',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      await expect(
+        addHousingImages(listing.id, { id: otherStudent.id, role: 'student' }, ['data:image/png;base64,...'])
+      ).rejects.toMatchObject({ statusCode: 403 });
+    });
+
+    it('lanza AppError con IMAGE_UPDATE_FAILED si el repositorio falla al guardar las imagenes', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await createHousing(landlord.id, {
+        title: 'Falla al guardar imagenes',
+        pricePen: 250,
+        distanceToUnschMinutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. FallaImagen 123',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      const TINY_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+      const originalFn = housingRepo.updateHousingImages;
+      housingRepo.updateHousingImages = jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Update failed' }
+      });
+
+      try {
+        await expect(
+          addHousingImages(listing.id, { id: landlord.id, role: 'landlord' }, [TINY_IMAGE])
+        ).rejects.toMatchObject({ statusCode: 400, code: 'IMAGE_UPDATE_FAILED' });
+      } finally {
+        housingRepo.updateHousingImages = originalFn;
+      }
+    });
+
+    it('funciona si la publicacion real no tenia images (columna null/undefined)', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await createHousing(landlord.id, {
+        title: 'Sin images previas',
+        pricePen: 250,
+        distanceToUnschMinutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. SinImages 123',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      const originalFn = housingRepo.findHousingById;
+      housingRepo.findHousingById = jest.fn().mockResolvedValue({
+        data: { ...listing, images: undefined },
+        error: null
+      });
+
+      const TINY_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+      try {
+        const updated = await addHousingImages(listing.id, { id: landlord.id, role: 'landlord' }, [TINY_IMAGE]);
+        expect(updated.images).toHaveLength(1);
+      } finally {
+        housingRepo.findHousingById = originalFn;
+      }
+    });
+
+    it('permite agregar imagenes como admin', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const admin = await createRealUser({ role: 'admin' });
+
+      const listing = await createHousing(landlord.id, {
+        title: 'Habitacion para admin',
+        pricePen: 250,
+        distanceToUnschMinutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. Admin 123',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      const TINY_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+      const updated = await addHousingImages(listing.id, { id: admin.id, role: 'admin' }, [TINY_IMAGE]);
+      expect(updated).toBeDefined();
     });
   });
 });

@@ -3,6 +3,7 @@ import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import { requestLogger } from './middlewares/requestLogger.middleware.js';
 import { apiLimiter } from './middlewares/rateLimiter.middleware.js';
 import errorHandler from './middlewares/errorHandler.middleware.js';
@@ -11,6 +12,9 @@ import housingRoutes from './routes/housing.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import roommatesRoutes from './routes/roommates.routes.js';
 import chatRoutes from './routes/chat.routes.js';
+import makiRoutes from './routes/maki.routes.js';
+import favoritesRoutes from './routes/favorites.routes.js';
+import verificationRoutes from './routes/verification.routes.js';
 import logger from './config/logger.js';
 import swaggerSpec from './config/swagger.config.js';
 import swaggerUi from 'swagger-ui-express';
@@ -19,6 +23,9 @@ const app = express();
 
 // Seguridad HTTP
 app.use(helmet());
+
+// Compresion gzip de las respuestas (listados de housings pueden ser grandes)
+app.use(compression());
 
 // CORS restrictivo
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
@@ -79,6 +86,9 @@ app.use('/api/housings', housingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/roommates', roommatesRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/maki', makiRoutes);
+app.use('/api/favoritos', favoritesRoutes);
+app.use('/api/verificacion', verificationRoutes);
 
 // 404
 app.use((req, res) => {

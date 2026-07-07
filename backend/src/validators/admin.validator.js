@@ -17,3 +17,9 @@ export const housingStatusSchema = z.object({
     errorMap: () => ({ message: "estado debe ser 'approved', 'flagged' o 'suspended'" })
   })
 });
+
+export const setRoleSchema = z.object({
+  rol: z.enum(['student', 'landlord', 'admin'], {
+    errorMap: () => ({ message: "rol debe ser 'student', 'landlord' o 'admin'" })
+  })
+});

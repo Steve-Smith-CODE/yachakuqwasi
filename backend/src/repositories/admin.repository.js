@@ -52,3 +52,34 @@ export function updateProfileBlock(userId, { blockedUntil, motivo }) {
     .update({ blocked_until: blockedUntil, blocked_reason: motivo })
     .eq('id', userId);
 }
+
+export function findAllHousingsAdmin() {
+  return supabaseAdmin
+    .from('housing_listings')
+    .select('*, profiles!housing_listings_landlord_id_fkey(name, phone)')
+    .order('created_at', { ascending: false });
+}
+
+export function findAllProfiles() {
+  return supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false });
+}
+
+export function updateProfileRole(userId, role) {
+  return supabaseAdmin.from('profiles').update({ role }).eq('id', userId).select().single();
+}
+
+export function insertAuditLog({ userId, actorName, action, details, type }) {
+  return supabaseAdmin
+    .from('audit_logs')
+    .insert({ user_id: userId ?? null, actor_name: actorName, action, details, type })
+    .select()
+    .single();
+}
+
+export function findAuditLogs() {
+  return supabaseAdmin
+    .from('audit_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+}

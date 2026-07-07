@@ -1,4 +1,10 @@
-import { insertHousing, findApprovedHousings, findHousingById, updateHousingImages } from '../repositories/housing.repository.js';
+import {
+  insertHousing,
+  findApprovedHousings,
+  findHousingById,
+  updateHousingImages,
+  findHousingsByLandlord
+} from '../repositories/housing.repository.js';
 import { geocode } from './geocoding.service.js';
 import { uploadHousingImages } from './image.service.js';
 import { NotFoundError, ForbiddenError, AppError } from '../errors/AppError.js';
@@ -89,6 +95,18 @@ export async function addHousingImages(housingId, user, images) {
 
 export async function listHousings(filters = {}) {
   const { data, error } = await findApprovedHousings(filters);
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return data;
+}
+
+export async function listMyHousings(landlordId) {
+  const { data, error } = await findHousingsByLandlord(landlordId);
 
   if (error) {
     const err = new Error(error.message);

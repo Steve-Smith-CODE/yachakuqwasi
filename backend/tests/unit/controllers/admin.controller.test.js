@@ -1,4 +1,15 @@
-import { stats, pendingDocuments, reviewDoc, pendingHousings, reviewHousing, block } from '../../../src/controllers/admin.controller.js';
+import {
+  stats,
+  pendingDocuments,
+  reviewDoc,
+  pendingHousings,
+  reviewHousing,
+  block,
+  allHousings,
+  allUsers,
+  setRole,
+  logs
+} from '../../../src/controllers/admin.controller.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -125,5 +136,62 @@ describe('Admin Controller (Supabase local real)', () => {
     expect(res.json).toHaveBeenCalledWith({ message: 'Usuario bloqueado' });
     const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
     expect(profile.blocked_reason).toBe('Fraude');
+  });
+
+  it('allHousings responde con todas las publicaciones reales', async () => {
+    const landlord = await createRealUser({ role: 'landlord' });
+    const { data: listing } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlord.id,
+        title: 'Habitacion allHousings controller',
+        price_pen: 250,
+        distance_to_unsch_minutes: 6,
+        neighborhood: 'San Blas',
+        address: 'Jr. AllHousings 1',
+        contact_phone: '900000000',
+        status: 'pending'
+      })
+      .select()
+      .single();
+    createdListingIds.push(listing.id);
+
+    await allHousings(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.map((l) => l.id)).toContain(listing.id);
+  });
+
+  it('allUsers responde con todos los perfiles reales', async () => {
+    const student = await createRealUser({ role: 'student' });
+
+    await allUsers(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.map((u) => u.id)).toContain(student.id);
+  });
+
+  it('setRole actualiza el rol real y envuelve el resultado en { user }', async () => {
+    const student = await createRealUser({ role: 'student' });
+    req.params.id = student.id;
+    req.body = { rol: 'landlord' };
+    req.user = { id: student.id, name: 'Admin Test' };
+
+    await setRole(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.user.role).toBe('landlord');
+  });
+
+  it('logs responde con la bitacora real de auditoria', async () => {
+    const student = await createRealUser({ role: 'student' });
+    req.params.id = student.id;
+    req.body = { motivo: 'Auditoria', dias: 1 };
+    await block(req, res);
+
+    await logs(req, res);
+
+    const body = res.json.mock.calls[res.json.mock.calls.length - 1][0];
+    expect(Array.isArray(body)).toBe(true);
   });
 });
