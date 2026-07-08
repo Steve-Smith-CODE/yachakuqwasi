@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, useScroll, useTransform, useMotionValueEvent } from "motion/react";
 import {
   Search,
@@ -19,10 +19,9 @@ import { listFavoritesRequest, addFavoriteRequest, removeFavoriteRequest } from 
 import { ApiError } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import HousingCard from "../components/HousingCard.jsx";
-import ListingDetailModal from "../components/ListingDetailModal.jsx";
-import { MACOT_TIPS, TIP_CATEGORY_LABEL, STUDENT_TESTIMONIALS, NEIGHBORHOODS, TYPE_OPTIONS } from "../constants/content.js";
-import unschLogoIcon from "../assets/images/unsch_logo_icon_new_1782937711905.jpg";
-import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
+import { MACOT_TIPS, TIP_CATEGORY_LABEL, STUDENT_TESTIMONIALS, NEIGHBORHOODS } from "../constants/content.js";
+import unschLogoIcon from "../assets/images/maqueta-unsch.webp";
+import makiMascot from "../assets/images/maki-mascota.webp";
 import heroVideo from "../assets/videos/intro-embers-bg.mp4";
 
 const ListingsMap = lazy(() => import("../components/ListingsMap.jsx"));
@@ -35,9 +34,9 @@ const PAGE_SIZE = 24;
 function MapStepIcon() {
   return (
     <svg viewBox="0 0 48 48" className="h-8 w-8">
-      <path d="M24 5C16.3 5 10 11.3 10 19c0 10.5 14 24 14 24s14-13.5 14-24c0-7.7-6.3-14-14-14z" fill="#7a1c1c" />
-      <circle cx="24" cy="19" r="6.5" fill="#FFD700" />
-      <circle cx="24" cy="19" r="2.4" fill="#7a1c1c" />
+      <path d="M24 5C16.3 5 10 11.3 10 19c0 10.5 14 24 14 24s14-13.5 14-24c0-7.7-6.3-14-14-14z" fill="#a62639" />
+      <circle cx="24" cy="19" r="6.5" fill="#f5b929" />
+      <circle cx="24" cy="19" r="2.4" fill="#a62639" />
     </svg>
   );
 }
@@ -45,11 +44,11 @@ function MapStepIcon() {
 function BudgetStepIcon() {
   return (
     <svg viewBox="0 0 48 48" className="h-8 w-8">
-      <ellipse cx="24" cy="35" rx="14" ry="4.5" fill="#334155" />
-      <ellipse cx="24" cy="29" rx="14" ry="4.5" fill="#64748b" />
-      <ellipse cx="24" cy="23" rx="14" ry="4.5" fill="#9b2d2d" />
-      <ellipse cx="24" cy="17" rx="14" ry="4.5" fill="#7a1c1c" />
-      <text x="24" y="20" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="#fff" fontFamily="'JetBrains Mono', monospace">
+      <ellipse cx="24" cy="35" rx="14" ry="4.5" fill="#33414d" />
+      <ellipse cx="24" cy="29" rx="14" ry="4.5" fill="#55697e" />
+      <ellipse cx="24" cy="23" rx="14" ry="4.5" fill="#c23652" />
+      <ellipse cx="24" cy="17" rx="14" ry="4.5" fill="#a62639" />
+      <text x="24" y="20" textAnchor="middle" fontSize="7.5" fontWeight="900" fill="#fff" fontFamily="'Inter', sans-serif">
         S/.
       </text>
     </svg>
@@ -59,10 +58,10 @@ function BudgetStepIcon() {
 function ChatStepIcon() {
   return (
     <svg viewBox="0 0 48 48" className="h-8 w-8">
-      <rect x="6" y="9" width="36" height="23" rx="8" fill="#7a1c1c" />
-      <path d="M15 32v7l9-7z" fill="#7a1c1c" />
-      <circle cx="24" cy="20.5" r="8.5" fill="#FFD700" />
-      <path d="M19.5 20.5l3 3 6-6.2" stroke="#581212" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="6" y="9" width="36" height="23" rx="8" fill="#a62639" />
+      <path d="M15 32v7l9-7z" fill="#a62639" />
+      <circle cx="24" cy="20.5" r="8.5" fill="#f5b929" />
+      <path d="M19.5 20.5l3 3 6-6.2" stroke="#6e1626" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -99,6 +98,7 @@ const staggerParent = prefersReducedMotion
 export default function ExplorePage() {
   const { isAuthenticated, user, token, openAuthModal } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -141,11 +141,11 @@ export default function ExplorePage() {
     }
   }, []);
 
-  async function load() {
+  async function load(overrideTipo = tipo) {
     setLoading(true);
     setError("");
     try {
-      const data = await listHousingsRequest({ barrio: barrio || undefined, tipo: tipo || undefined, page: 1, limit: PAGE_SIZE });
+      const data = await listHousingsRequest({ barrio: barrio || undefined, tipo: overrideTipo || undefined, page: 1, limit: PAGE_SIZE });
       setListings(data);
       setPage(1);
       setHasMore(data.length === PAGE_SIZE);
@@ -200,6 +200,12 @@ export default function ExplorePage() {
     );
   }, [listings, searchQuery]);
 
+  async function handleTypeClick(value) {
+    setTipo(value);
+    await load(value);
+    document.getElementById("listings-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function handleFilterSubmit(e) {
     e.preventDefault();
     const data = await load();
@@ -215,7 +221,15 @@ export default function ExplorePage() {
         item.neighborhood.toLowerCase().includes(q) ||
         (item.description || "").toLowerCase().includes(q)
     );
-    if (match) setTimeout(() => setSelectedListing(match), 550);
+    if (match) setTimeout(() => handleOpenListing(match), 550);
+  }
+
+  // Navega a /habitacion/:id (URL propia, compartible) en vez de solo abrir
+  // un modal por estado. App.jsx la muestra como overlay sobre esta misma
+  // pantalla via el patron de "background location" de react-router.
+  function handleOpenListing(listing) {
+    setSelectedListing(listing);
+    navigate(`/habitacion/${listing.id}`, { state: { backgroundLocation: location, listing } });
   }
 
   function handleScroll() {
@@ -298,7 +312,7 @@ export default function ExplorePage() {
             className="bg-white text-slate-800 p-4 md:p-6 rounded-3xl shadow-2xl border border-guindo/10 max-w-3xl mx-auto"
           >
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-              <div className="md:col-span-4 text-left">
+              <div className="md:col-span-6 text-left">
                 <label className="text-[10px] font-black tracking-wider text-plomo uppercase block mb-1">Buscar Zona / Calle</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
@@ -312,7 +326,7 @@ export default function ExplorePage() {
                 </div>
               </div>
 
-              <div className="md:col-span-3 text-left">
+              <div className="md:col-span-4 text-left">
                 <label className="text-[10px] font-black tracking-wider text-plomo uppercase block mb-1">Distrito (Huamanga)</label>
                 <select
                   value={barrio}
@@ -326,24 +340,11 @@ export default function ExplorePage() {
                 </select>
               </div>
 
-              <div className="md:col-span-3 text-left">
-                <label className="text-[10px] font-black tracking-wider text-plomo uppercase block mb-1">Tipo de Cuarto</label>
-                <select
-                  value={tipo}
-                  onChange={(e) => setTipo(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-bold text-slate-700 cursor-pointer"
-                >
-                  {TYPE_OPTIONS.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
-
               <div className="md:col-span-2 pt-4 md:pt-0">
                 <button
                   type="submit"
-                  className="btn-shine w-full text-white py-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_8px_20px_-6px_rgba(122,28,28,0.55)]"
-                  style={{ background: "linear-gradient(135deg, #9b2d2d 0%, #7a1c1c 55%, #4a0e0e 100%)" }}
+                  className="btn-shine w-full text-white py-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_8px_20px_-6px_rgba(166,38,57,0.55)]"
+                  style={{ background: "linear-gradient(135deg, #c23652 0%, #a62639 55%, #6e1626 100%)" }}
                 >
                   <Search className="h-4 w-4 text-dorado" />
                   <span>Buscar</span>
@@ -379,7 +380,7 @@ export default function ExplorePage() {
         </motion.div>
       </section>
 
-      <main className="relative z-10 -mt-10 bg-[#F8F9FA] rounded-t-[40px] shadow-[0_-20px_40px_rgba(0,0,0,0.15)] max-w-7xl mx-auto px-4 py-12 space-y-12">
+      <main className="relative z-10 -mt-10 bg-[#FDFBF7] rounded-t-[40px] shadow-[0_-20px_40px_rgba(0,0,0,0.15)] max-w-7xl mx-auto px-4 py-12 space-y-12">
         <motion.section
           id="como-funciona"
           className="scroll-mt-28 space-y-10"
@@ -404,7 +405,7 @@ export default function ExplorePage() {
               <motion.div key={step.eyebrow} variants={fadeUp} className="relative text-center space-y-3">
                 <div className="relative mx-auto h-16 w-16 rounded-2xl bg-white border border-guindo/15 shadow-[0_4px_18px_-6px_rgba(88,18,18,0.15)] flex items-center justify-center">
                   <step.Icon />
-                  <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-guindo text-white text-[9px] font-black flex items-center justify-center font-mono border-2 border-[#F8F9FA]">
+                  <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-guindo text-white text-[9px] font-black flex items-center justify-center font-mono border-2 border-[#FDFBF7]">
                     {i + 1}
                   </span>
                 </div>
@@ -452,7 +453,7 @@ export default function ExplorePage() {
                   key={tip.id}
                   onClick={() => setActiveTipIndex(idx)}
                   className={`px-3 py-2.5 rounded-xl text-xs font-bold text-left transition-all border cursor-pointer flex flex-col justify-between h-20 ${
-                    activeTipIndex === idx ? "bg-guindo text-white border-guindo shadow-md" : "bg-[#F8F9FA] text-slate-600 border-slate-200 hover:bg-slate-100"
+                    activeTipIndex === idx ? "bg-guindo text-white border-guindo shadow-md" : "bg-[#FDFBF7] text-slate-600 border-slate-200 hover:bg-slate-100"
                   }`}
                 >
                   <span className="block text-[10px] uppercase font-black tracking-wider opacity-85">{TIP_CATEGORY_LABEL[tip.category]}</span>
@@ -515,9 +516,30 @@ export default function ExplorePage() {
             )}
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { value: "", label: "Todos" },
+              { value: "room", label: "Individual" },
+              { value: "shared", label: "Compartido" }
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleTypeClick(opt.value)}
+                className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-wide transition-all cursor-pointer border-2 ${
+                  tipo === opt.value
+                    ? "bg-guindo border-guindo text-white shadow-md"
+                    : "bg-white border-slate-200 text-slate-600 hover:border-guindo/40"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#F8F9FA] to-transparent pointer-events-none z-10" />
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#F8F9FA] to-transparent pointer-events-none z-10" />
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#FDFBF7] to-transparent pointer-events-none z-10" />
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#FDFBF7] to-transparent pointer-events-none z-10" />
 
             <div
               ref={scrollContainerRef}
@@ -545,7 +567,7 @@ export default function ExplorePage() {
                   <HousingCard
                     key={room.id}
                     listing={room}
-                    onOpen={setSelectedListing}
+                    onOpen={handleOpenListing}
                     isFavorite={favoriteIds.has(room.id)}
                     onToggleFavorite={handleToggleFavorite}
                   />
@@ -592,14 +614,14 @@ export default function ExplorePage() {
 
             <Suspense
               fallback={
-                <div className="rounded-2xl border border-slate-200 h-96 bg-[#F8F9FA] animate-pulse flex items-center justify-center text-xs text-slate-400 font-bold">
+                <div className="rounded-2xl border border-slate-200 h-96 bg-[#FDFBF7] animate-pulse flex items-center justify-center text-xs text-slate-400 font-bold">
                   Cargando mapa...
                 </div>
               }
             >
               <ListingsMap
                 listings={filteredListings}
-                onSelectListing={setSelectedListing}
+                onSelectListing={handleOpenListing}
                 selectedListingId={selectedListing?.id}
               />
             </Suspense>
@@ -651,9 +673,9 @@ export default function ExplorePage() {
       <footer
         className="relative text-white py-12 px-4 overflow-hidden"
         style={{
-          background: "linear-gradient(135deg, #7a1c1c 0%, #581212 60%, #2a0808 100%)",
+          background: "linear-gradient(135deg, #a62639 0%, #6e1626 60%, #3d0d14 100%)",
           backgroundImage:
-            "repeating-linear-gradient(45deg, rgba(255,215,0,.09) 0 2px, transparent 2px 14px), repeating-linear-gradient(-45deg, rgba(255,215,0,.09) 0 2px, transparent 2px 14px), linear-gradient(135deg, #7a1c1c 0%, #581212 60%, #2a0808 100%)"
+            "repeating-linear-gradient(45deg, rgba(245,185,41,.11) 0 2px, transparent 2px 14px), repeating-linear-gradient(-45deg, rgba(245,185,41,.11) 0 2px, transparent 2px 14px), linear-gradient(135deg, #a62639 0%, #6e1626 60%, #3d0d14 100%)"
         }}
       >
         <div className="absolute inset-x-0 top-0 h-1 bg-dorado" />
@@ -701,7 +723,6 @@ export default function ExplorePage() {
         </div>
       </footer>
 
-      {selectedListing && <ListingDetailModal listing={selectedListing} onClose={() => setSelectedListing(null)} />}
     </>
   );
 }

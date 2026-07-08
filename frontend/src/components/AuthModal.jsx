@@ -4,7 +4,7 @@ import { Mail, Lock, User, X, LogIn, UserPlus, Loader2, ArrowRight } from "lucid
 import { useAuth } from "../context/AuthContext.jsx";
 import { ApiError } from "../api/client.js";
 import { UNSCH_ACADEMIC_MAP, FACULTIES } from "../constants/content.js";
-import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
+import makiMascot from "../assets/images/maki-mascota.webp";
 
 export default function AuthModal() {
   const { authModal, closeAuthModal, login, register } = useAuth();
@@ -74,27 +74,28 @@ export default function AuthModal() {
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto scrollbar-thin">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
           />
 
+          <div className="relative min-h-full flex items-center justify-center p-4">
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white rounded-3xl max-w-md w-full shadow-2xl relative z-10 border border-guindo/10 overflow-y-auto max-h-[92vh]"
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl relative z-10 border border-guindo/10"
           >
             <div
               className="relative h-24 rounded-t-3xl overflow-hidden"
               style={{
-                background: "linear-gradient(135deg, #7a1c1c 0%, #581212 60%, #2a0808 100%)",
+                background: "linear-gradient(135deg, #a62639 0%, #6e1626 60%, #3d0d14 100%)",
                 backgroundImage:
-                  "repeating-linear-gradient(45deg, rgba(255,215,0,.09) 0 2px, transparent 2px 14px), repeating-linear-gradient(-45deg, rgba(255,215,0,.09) 0 2px, transparent 2px 14px), linear-gradient(135deg, #7a1c1c 0%, #581212 60%, #2a0808 100%)"
+                  "repeating-linear-gradient(45deg, rgba(245,185,41,.11) 0 2px, transparent 2px 14px), repeating-linear-gradient(-45deg, rgba(245,185,41,.11) 0 2px, transparent 2px 14px), linear-gradient(135deg, #a62639 0%, #6e1626 60%, #3d0d14 100%)"
               }}
             >
               <div className="absolute inset-x-0 bottom-0 h-1 bg-dorado" />
@@ -115,7 +116,7 @@ export default function AuthModal() {
                   </div>
                   <span className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
                 </div>
-                <h3 className="font-display text-xl font-extrabold text-[#3b0d0d] tracking-tight">
+                <h3 className="font-display text-xl font-extrabold text-[#3d0d14] tracking-tight">
                   {localMode === "login" ? "Iniciar Sesión con Maki" : "Crear Cuenta con Maki"}
                 </h3>
                 <p className="text-slate-400 text-xs">
@@ -253,8 +254,8 @@ export default function AuthModal() {
                 disabled={loading}
                 whileHover={{ scale: loading ? 1 : 1.015 }}
                 whileTap={{ scale: loading ? 1 : 0.98 }}
-                className="btn-shine relative w-full text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_8px_20px_-6px_rgba(122,28,28,0.55)]"
-                style={{ background: "linear-gradient(135deg, #9b2d2d 0%, #7a1c1c 55%, #4a0e0e 100%)" }}
+                className="btn-shine relative w-full text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_8px_20px_-6px_rgba(166,38,57,0.55)]"
+                style={{ background: "linear-gradient(135deg, #c23652 0%, #a62639 55%, #6e1626 100%)" }}
               >
                 <span className="absolute inset-x-0 top-0 h-1/2 bg-white/10 pointer-events-none" />
                 {loading ? (
@@ -286,6 +287,7 @@ export default function AuthModal() {
             </div>
             </div>
           </motion.div>
+          </div>
         </div>
       )}
     </AnimatePresence>

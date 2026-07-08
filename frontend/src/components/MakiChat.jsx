@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Send, X } from "lucide-react";
 import { sendMakiMessage } from "../api/maki.js";
 import { ApiError } from "../api/client.js";
-import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
+import makiMascot from "../assets/images/maki-mascota.webp";
 
 const WELCOME_MESSAGE = {
   sender: "maki",
@@ -91,7 +91,7 @@ export default function MakiChat({ open, onClose }) {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-4">
               {messages.map((msg, idx) => (
                 <div key={idx} className={`flex gap-2.5 max-w-[85%] ${msg.sender === "user" ? "ml-auto flex-row-reverse" : "mr-auto"}`}>
                   {msg.sender === "maki" && (

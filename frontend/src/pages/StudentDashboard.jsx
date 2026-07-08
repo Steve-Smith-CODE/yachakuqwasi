@@ -8,8 +8,8 @@ import { getStudentStatsRequest } from "../api/stats.js";
 import { getPlaceholderImage } from "../constants/placeholderImages.js";
 import { fileToDataUrl } from "../utils/files.js";
 import StatCard from "../components/StatCard.jsx";
-import unschLogoIcon from "../assets/images/unsch_logo_icon_new_1782937711905.jpg";
-import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
+import unschLogoIcon from "../assets/images/maqueta-unsch.webp";
+import makiMascot from "../assets/images/maki-mascota.webp";
 
 export default function StudentDashboard() {
   const { token, user } = useAuth();
@@ -153,7 +153,7 @@ export default function StudentDashboard() {
               <span>Mensajes con Arrendadores</span>
             </h4>
           </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+          <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-slate-100">
             {chatsLoading ? (
               <div className="p-8 text-center text-slate-400 text-xs">Cargando chats...</div>
             ) : chats.length === 0 ? (
@@ -269,7 +269,7 @@ export default function StudentDashboard() {
             <div className="bg-slate-900 text-white p-3.5 shrink-0">
               <h5 className="text-[11px] font-black truncate">{activeChat.housing_listings?.title || "Chat"}</h5>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-[#FAF9F5]">
+            <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5 bg-[#FAF9F5]">
               {messages.map((m) => (
                 <div key={m.id} className={`max-w-[85%] space-y-0.5 ${m.sender === "student" ? "ml-auto" : "mr-auto"}`}>
                   <div className={`p-2.5 rounded-xl text-[11px] leading-relaxed ${

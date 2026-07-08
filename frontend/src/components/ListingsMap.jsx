@@ -1,22 +1,26 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
+import { LocateFixed } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
+import { getPlaceholderImage } from "../constants/placeholderImages.js";
+import unschCampusPhoto from "../assets/images/maqueta-unsch.webp";
 
 // Ubicacion aproximada del campus UNSCH en Ayacucho, usada como centro por
 // defecto del mapa y como referencia de distancia para el estudiante.
 const UNSCH_POSITION = [-13.1631, -74.2236];
+const UNSCH_LATLNG = L.latLng(UNSCH_POSITION);
 
 function priceIcon(price, isSelected) {
-  const bg = isSelected ? "#FFC000" : "#7a1c1c";
+  const bg = isSelected ? "#e8a100" : "#a62639";
   const text = isSelected ? "#1e293b" : "#ffffff";
-  const border = isSelected ? "#FFD700" : "#ffffff";
+  const border = isSelected ? "#f5b929" : "#ffffff";
   return L.divIcon({
     className: "",
-    html: `<div style="background:${bg};color:${text};border:2px solid ${border};border-radius:9999px;padding:3px 9px;font-size:10px;font-weight:900;font-family:'JetBrains Mono',monospace;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">S/.${price}</div>`,
+    html: `<div style="background:${bg};color:${text};border:2px solid ${border};border-radius:9999px;padding:3px 9px;font-size:10px;font-weight:900;font-family:'Inter',sans-serif;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">S/.${price}</div>`,
     iconSize: [56, 26],
     iconAnchor: [28, 13]
   });
@@ -24,8 +28,8 @@ function priceIcon(price, isSelected) {
 
 const unschIcon = L.divIcon({
   className: "",
-  html: `<div style="background:#7a1c1c;border:2px solid white;border-radius:10px;padding:4px;box-shadow:0 4px 10px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;width:26px;height:26px;">
-      <div style="width:100%;height:100%;border-radius:5px;background:white;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#7a1c1c;font-family:'JetBrains Mono',monospace;">U</div>
+  html: `<div style="background:#a62639;border:2px solid white;border-radius:10px;padding:4px;box-shadow:0 4px 10px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;width:26px;height:26px;">
+      <div style="width:100%;height:100%;border-radius:5px;background:white;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#a62639;font-family:'Inter',sans-serif;">U</div>
     </div>`,
   iconSize: [34, 34],
   iconAnchor: [17, 17]
@@ -33,7 +37,7 @@ const unschIcon = L.divIcon({
 
 function clusterIcon(cluster) {
   return L.divIcon({
-    html: `<div style="background:#7a1c1c;color:#fff;border:2px solid white;border-radius:9999px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;font-family:'JetBrains Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.35);">${cluster.getChildCount()}</div>`,
+    html: `<div style="background:#a62639;color:#fff;border:2px solid white;border-radius:9999px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;font-family:'Inter',sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.35);">${cluster.getChildCount()}</div>`,
     className: "",
     iconSize: [36, 36]
   });
@@ -48,6 +52,48 @@ function FitBounds({ points }) {
     map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 16 });
   }, [points, map]);
   return null;
+}
+
+// Boton flotante, estilo "volver a mi ubicacion" de Google Maps: solo aparece
+// cuando el campus deja de estar visible (el usuario arrastro o hizo zoom
+// lejos de la zona) y al click hace un flyTo animado de regreso.
+function RecenterControl() {
+  const map = useMap();
+  const [visible, setVisible] = useState(false);
+  const btnRef = useRef(null);
+
+  useEffect(() => {
+    function checkVisibility() {
+      setVisible(!map.getBounds().contains(UNSCH_LATLNG));
+    }
+    checkVisibility();
+    map.on("moveend", checkVisibility);
+    map.on("zoomend", checkVisibility);
+    return () => {
+      map.off("moveend", checkVisibility);
+      map.off("zoomend", checkVisibility);
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (btnRef.current) L.DomEvent.disableClickPropagation(btnRef.current);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <button
+      ref={btnRef}
+      type="button"
+      onClick={() => map.flyTo(UNSCH_POSITION, 15, { duration: 0.8 })}
+      title="Volver al campus UNSCH"
+      aria-label="Volver al campus UNSCH"
+      className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 bg-white text-guindo text-[11px] font-bold px-3 py-2 rounded-full shadow-lg border border-guindo/15 hover:bg-guindo hover:text-white active:scale-95 transition-all cursor-pointer animate-fade-in"
+    >
+      <LocateFixed className="h-3.5 w-3.5 shrink-0" />
+      Volver a la UNSCH
+    </button>
+  );
 }
 
 export default function ListingsMap({ listings, onSelectListing, selectedListingId }) {
@@ -74,10 +120,21 @@ export default function ListingsMap({ listings, onSelectListing, selectedListing
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <FitBounds points={points} />
+        <RecenterControl />
 
         <Marker position={UNSCH_POSITION} icon={unschIcon}>
-          <Popup>
-            <strong>Campus UNSCH</strong>
+          <Popup minWidth={190} maxWidth={220}>
+            <div className="space-y-1.5">
+              <img
+                src={unschCampusPhoto}
+                alt="Campus de la Universidad Nacional de San Cristobal de Huamanga"
+                className="w-full h-24 object-cover rounded-lg"
+              />
+              <strong className="block text-xs text-guindo">Campus UNSCH</strong>
+              <span className="block text-[10px] text-slate-500 leading-snug">
+                Universidad Nacional de San Cristobal de Huamanga, Ayacucho
+              </span>
+            </div>
           </Popup>
         </Marker>
 
@@ -87,13 +144,31 @@ export default function ListingsMap({ listings, onSelectListing, selectedListing
               key={room.id}
               position={[room.coordinate_y, room.coordinate_x]}
               icon={priceIcon(room.price_pen, room.id === selectedListingId)}
-              eventHandlers={{ click: () => onSelectListing(room) }}
             >
-              <Popup>
-                <div className="space-y-0.5 text-xs">
-                  <strong className="block">{room.title}</strong>
-                  <span className="block text-slate-500">{room.neighborhood}</span>
-                  <span className="block font-black text-guindo">S/. {room.price_pen} / mes</span>
+              <Popup minWidth={200} maxWidth={220}>
+                <div className="space-y-1.5">
+                  <img
+                    src={room.images?.[0] || getPlaceholderImage(room.type, room.id)}
+                    alt={room.title}
+                    className="w-full h-24 object-cover rounded-lg"
+                  />
+                  <strong className="block text-xs leading-snug">{room.title}</strong>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500">
+                    <span>{room.neighborhood}</span>
+                    {room.distance_to_unsch_minutes != null && (
+                      <span>A {room.distance_to_unsch_minutes} min de la UNSCH</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="font-black text-guindo text-xs">S/. {room.price_pen} / mes</span>
+                    <button
+                      type="button"
+                      onClick={() => onSelectListing(room)}
+                      className="text-[10px] font-bold text-white bg-guindo px-2.5 py-1.5 rounded-lg hover:bg-guindo-dark transition-colors cursor-pointer"
+                    >
+                      Ver alojamiento →
+                    </button>
+                  </div>
                 </div>
               </Popup>
             </Marker>

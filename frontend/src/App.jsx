@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import NavBar from "./components/NavBar.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import MakiChat from "./components/MakiChat.jsx";
 import AuthModal from "./components/AuthModal.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import ExplorePage from "./pages/ExplorePage.jsx";
+import ListingDetailPage from "./pages/ListingDetailPage.jsx";
 import PublishPage from "./pages/PublishPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
@@ -16,6 +17,13 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
   const audioRef = useRef(null);
+  const location = useLocation();
+  // Patron de "modal route": si llegamos aca via click (con backgroundLocation
+  // en el state), las Routes de abajo siguen mostrando esa pantalla de fondo
+  // y la ruta /habitacion/:id se dibuja aparte, encima, como overlay. Si se
+  // entra directo (link compartido, F5), no hay backgroundLocation y
+  // /habitacion/:id se resuelve como pantalla normal dentro de las mismas Routes.
+  const backgroundLocation = location.state?.backgroundLocation;
 
   function toggleSound() {
     const audio = audioRef.current;
@@ -31,12 +39,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-[#334155] font-sans selection:bg-guindo selection:text-white">
+    <div className="min-h-screen bg-[#FDFBF7] text-plomo-dark font-sans selection:bg-guindo selection:text-white">
       <audio ref={audioRef} src={heroTheme} loop preload="none" />
       <NavBar onOpenMaki={() => setIsChatOpen(true)} soundOn={soundOn} onToggleSound={toggleSound} />
-      <Routes>
+      <Routes location={backgroundLocation || location}>
         <Route path="/" element={<Navigate to="/explorar" replace />} />
         <Route path="/explorar" element={<ExplorePage />} />
+        <Route path="/habitacion/:id" element={<ListingDetailPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/publicar"
@@ -72,6 +81,13 @@ export default function App() {
         />
         <Route path="*" element={<Navigate to="/explorar" replace />} />
       </Routes>
+
+      {backgroundLocation && (
+        <Routes>
+          <Route path="/habitacion/:id" element={<ListingDetailPage />} />
+        </Routes>
+      )}
+
       <MakiChat open={isChatOpen} onClose={() => setIsChatOpen(false)} />
       <AuthModal />
     </div>

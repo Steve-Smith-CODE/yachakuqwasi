@@ -196,7 +196,7 @@ export default function LandlordDashboard() {
                   ))}
                 </div>
               )}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-[#FAF9F5]">
+              <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5 bg-[#FAF9F5]">
                 {messages.map((m) => (
                   <div key={m.id} className={`max-w-[85%] space-y-0.5 ${m.sender === "landlord" ? "ml-auto" : "mr-auto"}`}>
                     <div className={`p-2.5 rounded-xl text-[11px] leading-relaxed ${

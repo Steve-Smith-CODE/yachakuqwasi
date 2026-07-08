@@ -2,8 +2,8 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { LogOut, MessageCircle, Plus, Search, Award, Clock, Volume2, VolumeX, LogIn } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import NotificationBell from "./NotificationBell.jsx";
-import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
-import unschLogoIcon from "../assets/images/unsch_logo_icon_new_1782937711905.jpg";
+import makiMascot from "../assets/images/maki-mascota.webp";
+import unschLogoIcon from "../assets/images/maqueta-unsch.webp";
 
 const ROLE_LABEL = { student: "Estudiante", landlord: "Arrendador", admin: "Administrador" };
 
@@ -66,8 +66,8 @@ export default function NavBar({ onOpenMaki, soundOn, onToggleSound }) {
             ) : (
               <button
                 onClick={() => openAuthModal("login")}
-                className="btn-shine flex items-center gap-2 text-white px-4 py-2 rounded-xl text-xs font-black tracking-wide hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer shadow-[0_6px_16px_-4px_rgba(122,28,28,0.5)]"
-                style={{ background: "linear-gradient(135deg, #9b2d2d 0%, #7a1c1c 55%, #4a0e0e 100%)" }}
+                className="btn-shine flex items-center gap-2 text-white px-4 py-2 rounded-xl text-xs font-black tracking-wide hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer shadow-[0_6px_16px_-4px_rgba(166,38,57,0.5)]"
+                style={{ background: "linear-gradient(135deg, #c23652 0%, #a62639 55%, #6e1626 100%)" }}
               >
                 <span className="absolute inset-x-0 top-0 h-1/2 bg-white/10 pointer-events-none" />
                 <LogIn className="h-3.5 w-3.5 text-dorado" />
@@ -87,8 +87,8 @@ export default function NavBar({ onOpenMaki, soundOn, onToggleSound }) {
             {isAuthenticated && (user.role === "landlord" || user.role === "admin") && (
               <Link
                 to="/publicar"
-                className="btn-shine hidden sm:flex items-center gap-1.5 text-white px-3.5 py-2 rounded-xl font-black text-sm hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer shadow-[0_6px_16px_-4px_rgba(122,28,28,0.5)]"
-                style={{ background: "linear-gradient(135deg, #9b2d2d 0%, #7a1c1c 55%, #4a0e0e 100%)" }}
+                className="btn-shine hidden sm:flex items-center gap-1.5 text-white px-3.5 py-2 rounded-xl font-black text-sm hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer shadow-[0_6px_16px_-4px_rgba(166,38,57,0.5)]"
+                style={{ background: "linear-gradient(135deg, #c23652 0%, #a62639 55%, #6e1626 100%)" }}
               >
                 <Plus className="h-4 w-4 text-dorado" />
                 <span>Publicar Habitación</span>

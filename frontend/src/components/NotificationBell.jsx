@@ -115,7 +115,7 @@ export default function NotificationBell() {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+            <div className="flex-1 overflow-y-auto scrollbar-thin divide-y divide-slate-100">
               {notifications.length === 0 ? (
                 <p className="text-center text-xs text-slate-400 py-10">No tienes notificaciones.</p>
               ) : (
