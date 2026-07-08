@@ -114,6 +114,22 @@ describe('GroqMakiService', () => {
     expect(fakeTool.execute).not.toHaveBeenCalled();
   });
 
+  it('chat devuelve "" (no null/undefined) si la tool no existe y el mensaje no trae content', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      jsonResponse({
+        choices: [
+          { message: { content: null, tool_calls: [{ id: 'c1', function: { name: 'no_existe', arguments: '{}' } }] } }
+        ]
+      })
+    );
+    const service = new GroqMakiService('key', [fakeTool]);
+
+    const result = await service.chat('hola', 'system');
+
+    expect(result).toBe('');
+    expect(fakeTool.execute).not.toHaveBeenCalled();
+  });
+
   it('chat ejecuta la tool solicitada y hace una segunda llamada con el resultado', async () => {
     global.fetch = jest
       .fn()
@@ -137,6 +153,29 @@ describe('GroqMakiService', () => {
     expect(fakeTool.execute).toHaveBeenCalledWith({ x: '1' });
     expect(result).toBe('respuesta final groq');
     expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('chat usa {} como argumentos si function.arguments viene vacio/undefined', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [{ id: 'c1', function: { name: 'fake_tool', arguments: undefined } }]
+              }
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ choices: [{ message: {} }] }));
+    const service = new GroqMakiService('key', [fakeTool]);
+
+    await service.chat('hola', 'system');
+
+    expect(fakeTool.execute).toHaveBeenCalledWith({});
   });
 
   it('chat usa {} como argumentos si el JSON de arguments es invalido', async () => {

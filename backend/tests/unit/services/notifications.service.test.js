@@ -1,4 +1,10 @@
-import { listMyNotifications, markAsRead, markAllAsRead } from '../../../src/services/notifications.service.js';
+import {
+  listMyNotifications,
+  markAsRead,
+  markAllAsRead,
+  notifyLandlordOfHousingReview,
+  notifyAdminsOfNewHousing
+} from '../../../src/services/notifications.service.js';
 import * as notificationsRepo from '../../../src/repositories/notifications.repository.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -30,6 +36,37 @@ describe('Notifications Service (Supabase local real)', () => {
         });
       } finally {
         notificationsRepo.findNotificationsForUser = originalFind;
+      }
+    });
+
+    it('lanza AppError con NOTIFICATIONS_FETCH_FAILED si solo falla el conteo de no leidas', async () => {
+      const originalCount = notificationsRepo.countUnreadNotifications;
+      notificationsRepo.countUnreadNotifications = jest.fn().mockResolvedValue({
+        count: null,
+        error: { message: 'Count failed' }
+      });
+
+      try {
+        await expect(listMyNotifications('cualquier-id')).rejects.toMatchObject({
+          statusCode: 500,
+          code: 'NOTIFICATIONS_FETCH_FAILED'
+        });
+      } finally {
+        notificationsRepo.countUnreadNotifications = originalCount;
+      }
+    });
+
+    it('usa 0 como unreadCount si el repositorio devuelve count null sin error', async () => {
+      const originalCount = notificationsRepo.countUnreadNotifications;
+      notificationsRepo.countUnreadNotifications = jest.fn().mockResolvedValue({ count: null, error: null });
+
+      try {
+        const user = await createRealUser({ role: 'student' });
+        const result = await listMyNotifications(user.id);
+
+        expect(result.unreadCount).toBe(0);
+      } finally {
+        notificationsRepo.countUnreadNotifications = originalCount;
       }
     });
   });
@@ -82,6 +119,82 @@ describe('Notifications Service (Supabase local real)', () => {
         });
       } finally {
         notificationsRepo.markAllNotificationsRead = originalFn;
+      }
+    });
+  });
+
+  describe('notifyLandlordOfHousingReview', () => {
+    it('no inserta nada si el estado no es approved/flagged/suspended', async () => {
+      const insertSpy = jest.spyOn(notificationsRepo, 'insertNotifications');
+
+      await notifyLandlordOfHousingReview({
+        landlordId: 'cualquier-id',
+        listingId: null,
+        listingTitle: 'Cuarto de prueba',
+        estado: 'pending'
+      });
+
+      expect(insertSpy).not.toHaveBeenCalled();
+      insertSpy.mockRestore();
+    });
+
+    it('inserta una notificacion real cuando el estado es valido', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+
+      await notifyLandlordOfHousingReview({
+        landlordId: landlord.id,
+        listingId: null,
+        listingTitle: 'Cuarto de prueba',
+        estado: 'approved',
+        actorId: null
+      });
+
+      const { notifications } = await listMyNotifications(landlord.id);
+      expect(notifications.some((n) => n.type === 'listing_approved')).toBe(true);
+    });
+  });
+
+  describe('notifyAdminsOfNewHousing', () => {
+    it('no inserta nada si no hay administradores', async () => {
+      const originalFn = notificationsRepo.findAdminIds;
+      notificationsRepo.findAdminIds = jest.fn().mockResolvedValue({ data: [], error: null });
+      const insertSpy = jest.spyOn(notificationsRepo, 'insertNotifications');
+
+      try {
+        await notifyAdminsOfNewHousing({ listingId: null, listingTitle: 'Cuarto de prueba', actorId: null });
+        expect(insertSpy).not.toHaveBeenCalled();
+      } finally {
+        notificationsRepo.findAdminIds = originalFn;
+        insertSpy.mockRestore();
+      }
+    });
+
+    it('no inserta nada si findAdminIds devuelve error', async () => {
+      const originalFn = notificationsRepo.findAdminIds;
+      notificationsRepo.findAdminIds = jest.fn().mockResolvedValue({ data: null, error: { message: 'boom' } });
+      const insertSpy = jest.spyOn(notificationsRepo, 'insertNotifications');
+
+      try {
+        await notifyAdminsOfNewHousing({ listingId: null, listingTitle: 'Cuarto de prueba', actorId: null });
+        expect(insertSpy).not.toHaveBeenCalled();
+      } finally {
+        notificationsRepo.findAdminIds = originalFn;
+        insertSpy.mockRestore();
+      }
+    });
+
+    it('inserta una notificacion real por cada administrador encontrado', async () => {
+      const admin = await createRealUser({ role: 'admin' });
+      const originalFn = notificationsRepo.findAdminIds;
+      notificationsRepo.findAdminIds = jest.fn().mockResolvedValue({ data: [{ id: admin.id }], error: null });
+
+      try {
+        await notifyAdminsOfNewHousing({ listingId: null, listingTitle: 'Cuarto nuevo de prueba', actorId: null });
+
+        const { notifications } = await listMyNotifications(admin.id);
+        expect(notifications.some((n) => n.type === 'listing_pending_review')).toBe(true);
+      } finally {
+        notificationsRepo.findAdminIds = originalFn;
       }
     });
   });
