@@ -1,11 +1,22 @@
-# CI de solo pruebas (sin deploy — no hay credenciales de Railway/hosting
-# configuradas para este proyecto).
-#
 # IMPORTANTE: la suite del backend prueba contra un proyecto Supabase REAL,
 # no con mocks (crea y borra usuarios/habitaciones de verdad). Los secrets
 # SUPABASE_* de abajo deben apuntar a un proyecto de PRUEBA/DEV dedicado,
 # nunca al de producción. Configúralos en:
 # Settings > Secrets and variables > Actions, en este repositorio.
+#
+# Deploy (deploy-backend/deploy-frontend, al final de este archivo): solo
+# corren en push a main, y cada paso de deploy se salta solo si falta su
+# secret (no rompen el pipeline si todavia no los configuraste). Para
+# activarlos de verdad hace falta:
+#   - Backend en Railway: crear el proyecto en railway.app, generar un token
+#     en Account Settings > Tokens, guardarlo como secret RAILWAY_TOKEN, y
+#     configurar ahi mismo las variables de entorno de produccion (las mismas
+#     de backend/.env.example, con el Supabase de PRODUCCION esta vez).
+#   - Frontend en Vercel: importar el repo en vercel.com (root directory
+#     "frontend"), y guardar como secrets VERCEL_TOKEN (Account Settings >
+#     Tokens), VERCEL_ORG_ID y VERCEL_PROJECT_ID (estos dos salen del archivo
+#     .vercel/project.json que Vercel genera la primera vez que se linkea el
+#     proyecto, con "vercel link" desde la carpeta frontend).
 name: CI
 
 on:
@@ -57,3 +68,39 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  deploy-backend:
+    name: Deploy backend a Railway
+    needs: backend-tests
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: railway up
+        if: ${{ env.RAILWAY_TOKEN != '' }}
+        working-directory: backend
+        run: npx -y @railway/cli up --service backend --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  deploy-frontend:
+    name: Deploy frontend a Vercel
+    needs: frontend-build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: vercel deploy --prod
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        working-directory: frontend
+        run: npx -y vercel deploy --prod --token "$VERCEL_TOKEN" --yes
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
