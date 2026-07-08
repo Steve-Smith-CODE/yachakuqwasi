@@ -212,6 +212,24 @@ export default function ExplorePage() {
     );
   }, [listings, searchQuery]);
 
+  // Filtro propio de la seccion "Habitaciones Disponibles": independiente del
+  // buscador del hero (searchQuery/barrio/tipo, que consulta el backend).
+  // Este solo refina al instante, en el cliente, lo que ya esta en pantalla
+  // (titulo, barrio, precio o alguna amenidad), sin tocar la API.
+  const [roomSearch, setRoomSearch] = useState("");
+
+  const visibleListings = useMemo(() => {
+    const q = roomSearch.trim().toLowerCase();
+    if (!q) return filteredListings;
+    return filteredListings.filter(
+      (item) =>
+        item.title.toLowerCase().includes(q) ||
+        item.neighborhood.toLowerCase().includes(q) ||
+        String(item.price_pen).includes(q) ||
+        (item.amenities || []).some((a) => a.toLowerCase().includes(q))
+    );
+  }, [filteredListings, roomSearch]);
+
   async function handleTypeClick(value) {
     setTipo(value);
     await load(value);
@@ -505,12 +523,12 @@ export default function ExplorePage() {
                 ) : loading ? (
                   "Cargando publicaciones reales..."
                 ) : (
-                  <>Mostrando <span className="font-bold text-guindo">{filteredListings.length} habitaciones</span> reales aprobadas.</>
+                  <>Mostrando <span className="font-bold text-guindo">{visibleListings.length} habitaciones</span> reales aprobadas.</>
                 )}
               </p>
             </div>
 
-            {filteredListings.length > 0 && (
+            {visibleListings.length > 0 && (
               <div className="flex items-center gap-3 self-end md:self-center">
                 <div className="hidden sm:flex items-center gap-2 mr-2">
                   <span className="text-[10px] font-mono text-slate-400">Progreso</span>
@@ -526,6 +544,17 @@ export default function ExplorePage() {
                 </button>
               </div>
             )}
+          </div>
+
+          <div className="relative max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Filtrar por título, barrio, precio o amenidad..."
+              value={roomSearch}
+              onChange={(e) => setRoomSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-guindo/40 focus:border-guindo text-xs bg-white shadow-sm transition-all"
+            />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -558,13 +587,14 @@ export default function ExplorePage() {
               onScroll={handleScroll}
               className="flex gap-6 overflow-x-auto pb-6 pt-2 px-1 snap-x snap-mandatory scroll-smooth scrollbar-none"
             >
-              {!loading && filteredListings.length === 0 ? (
+              {!loading && visibleListings.length === 0 ? (
                 <div className="w-full bg-white rounded-3xl border border-dashed border-guindo/20 p-12 text-center space-y-4">
                   <Compass className="h-12 w-12 text-slate-300 mx-auto stroke-1" />
                   <h4 className="font-extrabold text-slate-700">No encontramos habitaciones con esos filtros</h4>
                   <button
                     onClick={() => {
                       setSearchQuery("");
+                      setRoomSearch("");
                       setBarrio("");
                       setTipo("");
                       load();
@@ -575,7 +605,7 @@ export default function ExplorePage() {
                   </button>
                 </div>
               ) : (
-                filteredListings.map((room) => (
+                visibleListings.map((room) => (
                   <HousingCard
                     key={room.id}
                     listing={room}
@@ -632,7 +662,7 @@ export default function ExplorePage() {
               }
             >
               <ListingsMap
-                listings={filteredListings}
+                listings={visibleListings}
                 onSelectListing={handleOpenListing}
                 selectedListingId={selectedListing?.id}
               />
