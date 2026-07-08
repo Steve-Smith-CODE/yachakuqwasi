@@ -319,6 +319,52 @@ export default function ExplorePage() {
               <span className="bg-gradient-to-r from-dorado-dark to-dorado bg-clip-text text-transparent">Ayacucho</span>
             </h2>
 
+          <form
+            onSubmit={handleFilterSubmit}
+            className="bg-white text-slate-800 p-4 md:p-6 rounded-3xl shadow-2xl border border-guindo/10 max-w-3xl mx-auto"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+              <div className="md:col-span-6 text-left">
+                <label className="text-[10px] font-black tracking-wider text-plomo uppercase block mb-1">Buscar Zona / Calle</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Ej. San Blas, Carmen Alto..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50"
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-4 text-left">
+                <label className="text-[10px] font-black tracking-wider text-plomo uppercase block mb-1">Distrito (Huamanga)</label>
+                <select
+                  value={barrio}
+                  onChange={(e) => setBarrio(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-bold text-slate-700 cursor-pointer"
+                >
+                  <option value="">Todos los distritos</option>
+                  {NEIGHBORHOODS.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2 pt-4 md:pt-0">
+                <button
+                  type="submit"
+                  className="btn-shine w-full text-white py-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_8px_20px_-6px_rgba(166,38,57,0.55)]"
+                  style={{ background: "linear-gradient(135deg, #c23652 0%, #a62639 55%, #6e1626 100%)" }}
+                >
+                  <Search className="h-4 w-4 text-dorado" />
+                  <span>Buscar</span>
+                </button>
+              </div>
+            </div>
+          </form>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto pt-4 text-xs font-semibold text-slate-200">
             <div className="flex items-center justify-center gap-2">
               <Check className="h-4 w-4 text-dorado" /> <span>Cero comisiones ocultas</span>
@@ -482,68 +528,25 @@ export default function ExplorePage() {
             )}
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 md:p-5 space-y-4">
-            <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-              <div className="md:col-span-6 text-left">
-                <label className="text-[10px] font-black tracking-wider text-plomo uppercase block mb-1">Buscar Zona / Calle</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Ej. San Blas, Carmen Alto..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50"
-                  />
-                </div>
-              </div>
-
-              <div className="md:col-span-4 text-left">
-                <label className="text-[10px] font-black tracking-wider text-plomo uppercase block mb-1">Distrito (Huamanga)</label>
-                <select
-                  value={barrio}
-                  onChange={(e) => setBarrio(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-bold text-slate-700 cursor-pointer"
-                >
-                  <option value="">Todos los distritos</option>
-                  {NEIGHBORHOODS.map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <button
-                  type="submit"
-                  className="btn-shine w-full text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_8px_20px_-6px_rgba(166,38,57,0.45)]"
-                  style={{ background: "linear-gradient(135deg, #c23652 0%, #a62639 55%, #6e1626 100%)" }}
-                >
-                  <Search className="h-4 w-4 text-dorado" />
-                  <span>Buscar</span>
-                </button>
-              </div>
-            </form>
-
-            <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
-              {[
-                { value: "", label: "Todos" },
-                { value: "room", label: "Individual" },
-                { value: "shared", label: "Compartido" }
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => handleTypeClick(opt.value)}
-                  className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-wide transition-all cursor-pointer border-2 ${
-                    tipo === opt.value
-                      ? "bg-guindo border-guindo text-white shadow-md"
-                      : "bg-white border-slate-200 text-slate-600 hover:border-guindo/40"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { value: "", label: "Todos" },
+              { value: "room", label: "Individual" },
+              { value: "shared", label: "Compartido" }
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleTypeClick(opt.value)}
+                className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-wide transition-all cursor-pointer border-2 ${
+                  tipo === opt.value
+                    ? "bg-guindo border-guindo text-white shadow-md"
+                    : "bg-white border-slate-200 text-slate-600 hover:border-guindo/40"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
 
           <div className="relative">
