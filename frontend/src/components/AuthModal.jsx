@@ -28,6 +28,16 @@ export default function AuthModal() {
     wasOpen.current = open;
   }, [open, mode]);
 
+  useEffect(() => {
+    if (!open) return;
+    function handleKey(e) {
+      if (e.key === "Escape") handleClose();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   function resetForm() {
     setEmail("");
     setPassword("");
