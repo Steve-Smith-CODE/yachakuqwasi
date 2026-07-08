@@ -1,8 +1,0 @@
-{
-  "name": "Remix: YachakuqWasi",
-  "description": "El portal de alojamiento universitario definitivo para la Universidad Nacional de San Cristóbal de Huamanga (UNSCH) en Ayacucho, Perú, con colores guindo y plomo, y con Maki el halcón consejero.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

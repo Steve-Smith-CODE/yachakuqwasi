@@ -7,8 +7,8 @@
 <p>
 <img src="https://img.shields.io/badge/version-4-blue?style=for-the-badge" alt="version" />
 <img src="https://img.shields.io/badge/status-en%20desarrollo-yellow?style=for-the-badge" alt="status" />
-<img src="https://img.shields.io/badge/tests-216%2F216%20passing-brightgreen?style=for-the-badge" alt="tests" />
-<img src="https://img.shields.io/badge/coverage-99%25-brightgreen?style=for-the-badge" alt="coverage" />
+<img src="https://img.shields.io/badge/tests-257%2F257%20passing-brightgreen?style=for-the-badge" alt="tests" />
+<img src="https://img.shields.io/badge/coverage-99.5%25-brightgreen?style=for-the-badge" alt="coverage" />
 </p>
 
 </div>
@@ -17,12 +17,7 @@
 
 ## 📚 Sobre el proyecto
 
-**YachakuqWasi** ("la casa que enseña", en quechua) conecta a estudiantes de la UNSCH con arrendadores de cuartos, departamentos y casas cerca de la Ciudad Universitaria, en Ayacucho. Los estudiantes buscan y filtran alojamientos; los arrendadores publican propiedades; un panel de administración verifica documentos y modera usuarios.
-
-El repositorio contiene dos aplicaciones:
-
-- 🏠 **La plataforma real** (`backend/` + `frontend/` + `supabase/`) — el marketplace en producción.
-- 🦅 **Un prototipo** (raíz del repo) hecho en Google AI Studio: **Maki**, un asistente virtual (halcón mascota) que responde preguntas sobre alquileres con IA generativa.
+**YachakuqWasi** ("la casa que enseña", en quechua) conecta a estudiantes de la UNSCH con arrendadores de cuartos, departamentos y casas cerca de la Ciudad Universitaria, en Ayacucho. Los estudiantes buscan y filtran alojamientos; los arrendadores publican propiedades; un panel de administración verifica documentos y modera usuarios. Maki, la mascota (un halcón), es el asistente virtual con IA generativa (Gemini/Groq) integrado en la plataforma.
 
 ---
 
@@ -31,9 +26,8 @@ El repositorio contiene dos aplicaciones:
 | Carpeta | Contenido |
 |---|---|
 | `backend/` | API REST (Node.js + Express), autenticación y datos vía Supabase |
-| `frontend/` | Cliente web de la plataforma real (React + Vite) |
+| `frontend/` | Cliente web de la plataforma (React + Vite) |
 | `supabase/` | Esquema de base de datos y migraciones (Supabase CLI) |
-| `src/`, `server.ts` | Prototipo del asistente Maki (Vite + React + Gemini API) |
 
 ---
 
@@ -47,7 +41,7 @@ Se revisó el backend y se reforzaron varios puntos de seguridad y calidad, expl
 - 📝 **Cada petición queda registrada con un identificador único**, para poder rastrear qué pasó si algo falla.
 - ⏱️ **Se limita cuántas peticiones puede hacer una misma persona en poco tiempo**, para evitar abusos.
 - 🧩 **Se separó el arranque del servidor de su configuración**, para poder testear la API sin levantar un puerto real.
-- 🧪 **Todo esto sin romper nada:** los 70 tests automáticos del backend siguen pasando, con ~98% de cobertura de código.
+- 🧪 **Todo esto sin romper nada:** los 257 tests automáticos del backend siguen pasando, con ~99.5% de cobertura de código.
 
 ---
 
