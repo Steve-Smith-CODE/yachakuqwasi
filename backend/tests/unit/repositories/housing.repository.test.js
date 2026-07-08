@@ -84,6 +84,40 @@ describe('housing.repository (Supabase local real)', () => {
     });
   });
 
+  describe('findApprovedHousings - busqueda libre (q)', () => {
+    it('encuentra por titulo, barrio o direccion aunque este en otra pagina que la que se pidio', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const target = await insertApprovedListing(landlord.id, {
+        title: 'Cuarto exclusivo Quinua Search Test',
+        neighborhood: 'Quinua',
+        address: 'Jr. Busqueda 123'
+      });
+      await insertApprovedListing(landlord.id, { title: 'Otro cuarto sin relacion', neighborhood: 'Belén' });
+
+      const { data, error } = await findApprovedHousings({ q: 'Quinua Search Test', page: 1, limit: 5 });
+
+      expect(error).toBeNull();
+      expect(data.map((l) => l.id)).toContain(target.id);
+      expect(data.every((l) => l.title.includes('Quinua Search Test'))).toBe(true);
+    });
+
+    it('ignora comas y parentesis en el texto sin lanzar error (evita romper la sintaxis de .or())', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      await insertApprovedListing(landlord.id, { title: 'Cuarto con simbolos raros' });
+
+      const { error } = await findApprovedHousings({ q: 'texto, con (parentesis) y comas', page: 1, limit: 5 });
+
+      expect(error).toBeNull();
+    });
+
+    it('devuelve vacio si el texto no coincide con nada', async () => {
+      const { data, error } = await findApprovedHousings({ q: 'zzz_no_deberia_existir_zzz', page: 1, limit: 5 });
+
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    });
+  });
+
   describe('findApprovedHousingById', () => {
     it('devuelve la publicacion aprobada con el nombre del arrendador', async () => {
       const landlord = await createRealUser({ role: 'landlord', name: 'Arrendador Detalle' });

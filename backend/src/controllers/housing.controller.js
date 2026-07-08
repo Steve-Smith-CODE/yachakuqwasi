@@ -11,8 +11,8 @@ export async function uploadImages(req, res) {
 }
 
 export async function list(req, res) {
-  const { tipo, precio_max, barrio, page, limit } = req.query;
-  const listings = await listHousings({ tipo, precioMax: precio_max, barrio, page, limit });
+  const { tipo, precio_max, barrio, q, page, limit } = req.query;
+  const listings = await listHousings({ tipo, precioMax: precio_max, barrio, q, page, limit });
   res.json(listings);
 }
 

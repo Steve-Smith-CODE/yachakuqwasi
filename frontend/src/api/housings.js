@@ -1,7 +1,7 @@
 import { apiFetch } from "./client.js";
 
-export function listHousingsRequest({ tipo, precio_max, barrio, page, limit } = {}) {
-  return apiFetch("/housings", { params: { tipo, precio_max, barrio, page, limit } });
+export function listHousingsRequest({ tipo, precio_max, barrio, q, page, limit } = {}) {
+  return apiFetch("/housings", { params: { tipo, precio_max, barrio, q, page, limit } });
 }
 
 export function getHousingRequest(id) {

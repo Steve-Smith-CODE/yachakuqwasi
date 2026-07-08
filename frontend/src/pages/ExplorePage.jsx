@@ -145,7 +145,13 @@ export default function ExplorePage() {
     setLoading(true);
     setError("");
     try {
-      const data = await listHousingsRequest({ barrio: barrio || undefined, tipo: overrideTipo || undefined, page: 1, limit: PAGE_SIZE });
+      const data = await listHousingsRequest({
+        barrio: barrio || undefined,
+        tipo: overrideTipo || undefined,
+        q: searchQuery.trim() || undefined,
+        page: 1,
+        limit: PAGE_SIZE
+      });
       setListings(data);
       setPage(1);
       setHasMore(data.length === PAGE_SIZE);
@@ -163,7 +169,13 @@ export default function ExplorePage() {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const data = await listHousingsRequest({ barrio: barrio || undefined, tipo: tipo || undefined, page: nextPage, limit: PAGE_SIZE });
+      const data = await listHousingsRequest({
+        barrio: barrio || undefined,
+        tipo: tipo || undefined,
+        q: searchQuery.trim() || undefined,
+        page: nextPage,
+        limit: PAGE_SIZE
+      });
       setListings((prev) => [...prev, ...data]);
       setPage(nextPage);
       setHasMore(data.length === PAGE_SIZE);

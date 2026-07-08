@@ -9,7 +9,7 @@ export function insertHousing(record) {
 
 // Paginado via .range(): sin esto, un listado approved que crezca trae todas
 // las filas en cada request (era el principal cuello de botella de /housings).
-export function findApprovedHousings({ tipo, precioMax, barrio, page = 1, limit = DEFAULT_LIMIT } = {}) {
+export function findApprovedHousings({ tipo, precioMax, barrio, q, page = 1, limit = DEFAULT_LIMIT } = {}) {
   const safeLimit = Math.min(Number(limit) || DEFAULT_LIMIT, MAX_LIMIT);
   const safePage = Math.max(Number(page) || 1, 1);
   const from = (safePage - 1) * safeLimit;
@@ -25,6 +25,14 @@ export function findApprovedHousings({ tipo, precioMax, barrio, page = 1, limit 
   if (tipo) query = query.eq('type', tipo);
   if (precioMax) query = query.lte('price_pen', Number(precioMax));
   if (barrio) query = query.eq('neighborhood', barrio);
+
+  // Busqueda libre por zona/calle: se limpian "," y "()" porque tienen
+  // significado especial en la sintaxis de filtros de PostgREST y romperian
+  // el .or() de abajo si vinieran del texto que escribe el usuario.
+  if (q) {
+    const safeQ = q.replace(/[,()]/g, ' ').trim();
+    if (safeQ) query = query.or(`title.ilike.%${safeQ}%,neighborhood.ilike.%${safeQ}%,description.ilike.%${safeQ}%,address.ilike.%${safeQ}%`);
+  }
 
   return query;
 }
