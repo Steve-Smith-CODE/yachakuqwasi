@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Mail, Lock, User, X, LogIn, UserPlus, Loader2, ArrowRight } from "lucide-react";
+import { Mail, Lock, User, X, LogIn, UserPlus, Loader2, ArrowRight, KeyRound } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { ApiError } from "../api/client.js";
+import { forgotPasswordRequest } from "../api/auth.js";
 import { UNSCH_ACADEMIC_MAP, FACULTIES } from "../constants/content.js";
 import makiMascot from "../assets/images/maki-mascota.webp";
 
@@ -58,7 +59,10 @@ export default function AuthModal() {
     setSuccess("");
     setLoading(true);
     try {
-      if (localMode === "login") {
+      if (localMode === "forgot") {
+        const result = await forgotPasswordRequest(email);
+        setSuccess(result.message);
+      } else if (localMode === "login") {
         await login(email, password);
         handleClose();
       } else {
@@ -127,12 +131,18 @@ export default function AuthModal() {
                   <span className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
                 </div>
                 <h3 className="font-display text-xl font-extrabold text-[#3d0d14] tracking-tight">
-                  {localMode === "login" ? "Iniciar Sesión con Maki" : "Crear Cuenta con Maki"}
+                  {localMode === "login"
+                    ? "Iniciar Sesión con Maki"
+                    : localMode === "forgot"
+                      ? "Recuperar Contraseña"
+                      : "Crear Cuenta con Maki"}
                 </h3>
                 <p className="text-slate-400 text-xs">
                   {localMode === "login"
                     ? "Ingresa para gestionar tus favoritos y hablar con Maki"
-                    : "Regístrate en YachakuqWasi de forma totalmente gratuita"}
+                    : localMode === "forgot"
+                      ? "Escribe tu correo y te enviamos un enlace para restablecerla"
+                      : "Regístrate en YachakuqWasi de forma totalmente gratuita"}
                 </p>
               </div>
 
@@ -180,20 +190,37 @@ export default function AuthModal() {
                 </div>
               </div>
 
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Contraseña</label>
-                <div className="relative group">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-guindo transition-colors" />
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-medium transition-all placeholder:text-slate-400"
-                    required
-                  />
+              {localMode !== "forgot" && (
+                <div className="space-y-1 text-left">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase">Contraseña</label>
+                    {localMode === "login" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError("");
+                          setSuccess("");
+                          setLocalMode("forgot");
+                        }}
+                        className="text-[10px] font-bold text-guindo hover:text-guindo-dark transition-colors cursor-pointer"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative group">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-guindo transition-colors" />
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-medium transition-all placeholder:text-slate-400"
+                      required
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {localMode === "signup" && (
                 <>
@@ -272,28 +299,53 @@ export default function AuthModal() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : localMode === "login" ? (
                   <LogIn className="h-4 w-4 text-dorado" />
+                ) : localMode === "forgot" ? (
+                  <KeyRound className="h-4 w-4 text-dorado" />
                 ) : (
                   <UserPlus className="h-4 w-4 text-dorado" />
                 )}
-                <span>{loading ? "Procesando..." : localMode === "login" ? "Ingresar" : "Registrar Datos"}</span>
+                <span>
+                  {loading
+                    ? "Procesando..."
+                    : localMode === "login"
+                      ? "Ingresar"
+                      : localMode === "forgot"
+                        ? "Enviar Enlace"
+                        : "Registrar Datos"}
+                </span>
               </motion.button>
             </form>
 
             <div className="pt-5 border-t border-slate-100 text-center mt-6 space-y-2.5">
-              <p className="text-xs text-slate-500">
-                {localMode === "login" ? "¿No tienes una cuenta aún?" : "¿Ya estás registrado en YachakuqWasi?"}
-              </p>
-              <button
-                onClick={() => {
-                  setError("");
-                  setSuccess("");
-                  setLocalMode(localMode === "login" ? "signup" : "login");
-                }}
-                className="w-full flex items-center justify-center gap-1.5 border-2 border-guindo/25 text-guindo text-xs font-black py-2.5 rounded-xl hover:bg-guindo/5 hover:border-guindo/40 transition-all cursor-pointer group"
-              >
-                <span>{localMode === "login" ? "Crear cuenta ahora" : "Inicia sesión aquí"}</span>
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </button>
+              {localMode === "forgot" ? (
+                <button
+                  onClick={() => {
+                    setError("");
+                    setSuccess("");
+                    setLocalMode("login");
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 border-2 border-guindo/25 text-guindo text-xs font-black py-2.5 rounded-xl hover:bg-guindo/5 hover:border-guindo/40 transition-all cursor-pointer group"
+                >
+                  <span>Volver a iniciar sesión</span>
+                </button>
+              ) : (
+                <>
+                  <p className="text-xs text-slate-500">
+                    {localMode === "login" ? "¿No tienes una cuenta aún?" : "¿Ya estás registrado en YachakuqWasi?"}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setError("");
+                      setSuccess("");
+                      setLocalMode(localMode === "login" ? "signup" : "login");
+                    }}
+                    className="w-full flex items-center justify-center gap-1.5 border-2 border-guindo/25 text-guindo text-xs font-black py-2.5 rounded-xl hover:bg-guindo/5 hover:border-guindo/40 transition-all cursor-pointer group"
+                  >
+                    <span>{localMode === "login" ? "Crear cuenta ahora" : "Inicia sesión aquí"}</span>
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                </>
+              )}
             </div>
             </div>
           </motion.div>

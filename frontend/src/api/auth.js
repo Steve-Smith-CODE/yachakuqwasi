@@ -13,3 +13,10 @@ export function loginRequest({ email, password }) {
     body: { email, password }
   });
 }
+
+export function forgotPasswordRequest(email) {
+  return apiFetch("/auth/forgot-password", {
+    method: "POST",
+    body: { email }
+  });
+}

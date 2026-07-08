@@ -20,3 +20,11 @@ export function findProfileById(id) {
 export function updateAuthPassword(userId, password) {
   return supabaseAdmin.auth.admin.updateUserById(userId, { password });
 }
+
+// Dispara el correo de "restablecer contraseña" de Supabase Auth. El enlace
+// del correo trae una sesion de recuperacion que el frontend intercambia por
+// una nueva contraseña (ver ResetPasswordPage.jsx) — este backend nunca ve
+// la contraseña nueva en este paso.
+export function requestPasswordReset(email, redirectTo) {
+  return supabasePublic.auth.resetPasswordForEmail(email, { redirectTo });
+}

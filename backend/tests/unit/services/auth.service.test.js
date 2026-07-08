@@ -1,4 +1,5 @@
-import { registerUser, loginUser } from '../../../src/services/auth.service.js';
+import { registerUser, loginUser, forgotPassword } from '../../../src/services/auth.service.js';
+import * as authRepo from '../../../src/repositories/auth.repository.js';
 import { createRealUser, cleanupCreatedUsers, trackUserForCleanup, uniqueEmail } from '../../helpers/testData.js';
 
 afterAll(async () => {
@@ -54,6 +55,40 @@ describe('Auth Service (Supabase local real)', () => {
         message: 'Credenciales invalidas',
         statusCode: 401
       });
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('devuelve el mismo mensaje generico para un email real registrado', async () => {
+      const user = await createRealUser({ role: 'student' });
+
+      const result = await forgotPassword({ email: user.email });
+
+      expect(result).toEqual({
+        message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.'
+      });
+    });
+
+    it('devuelve el mismo mensaje generico para un email que no existe (no revela si esta registrado)', async () => {
+      const result = await forgotPassword({ email: uniqueEmail('no-existe') });
+
+      expect(result).toEqual({
+        message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.'
+      });
+    });
+
+    it('no lanza y devuelve el mismo mensaje si Supabase falla al enviar el correo', async () => {
+      const originalFn = authRepo.requestPasswordReset;
+      authRepo.requestPasswordReset = jest.fn().mockRejectedValue(new Error('SMTP no configurado'));
+
+      try {
+        const result = await forgotPassword({ email: uniqueEmail('smtp-caido') });
+        expect(result).toEqual({
+          message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.'
+        });
+      } finally {
+        authRepo.requestPasswordReset = originalFn;
+      }
     });
   });
 });

@@ -17,6 +17,7 @@ const PublishPage = lazy(() => import("./pages/PublishPage.jsx"));
 const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
 const AccountSettingsPage = lazy(() => import("./pages/AccountSettingsPage.jsx"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage.jsx"));
 
 function RouteFallback() {
   return (
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="/explorar" element={<ExplorePage />} />
           <Route path="/habitacion/:id" element={<ListingDetailPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/restablecer-password" element={<ResetPasswordPage />} />
           <Route
             path="/publicar"
             element={

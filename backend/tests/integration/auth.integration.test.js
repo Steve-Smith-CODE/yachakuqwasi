@@ -60,4 +60,30 @@ describe('Auth Integration (Supabase local real)', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('POST /api/auth/forgot-password', () => {
+    it('debe responder 200 con el mensaje generico para un email real', async () => {
+      const user = await createRealUser({ role: 'student' });
+
+      const res = await request(app).post('/api/auth/forgot-password').send({ email: user.email });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/restablecer tu contraseña/i);
+    });
+
+    it('debe responder 200 con el mismo mensaje aunque el email no exista (no revela cuentas)', async () => {
+      const res = await request(app)
+        .post('/api/auth/forgot-password')
+        .send({ email: uniqueEmail('integration-forgot-no-existe') });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/restablecer tu contraseña/i);
+    });
+
+    it('debe rechazar un email con formato invalido', async () => {
+      const res = await request(app).post('/api/auth/forgot-password').send({ email: 'no-es-un-email' });
+
+      expect(res.status).toBe(400);
+    });
+  });
 });

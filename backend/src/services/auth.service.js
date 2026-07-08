@@ -1,4 +1,5 @@
-import { createAuthUser, signInWithPassword, findProfileById } from '../repositories/auth.repository.js';
+import { createAuthUser, signInWithPassword, findProfileById, requestPasswordReset } from '../repositories/auth.repository.js';
+import logger from '../config/logger.js';
 
 export async function registerUser({ email, password, name, role, faculty, career, phone }) {
   const { data, error } = await createAuthUser({
@@ -35,4 +36,22 @@ export async function loginUser({ email, password }) {
     token: data.session.access_token,
     user: { id: data.user.id, email: data.user.email, ...profile }
   };
+}
+
+const GENERIC_RESET_MESSAGE = 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.';
+
+// Respuesta siempre generica (exista o no la cuenta) para no revelar que
+// correos estan registrados. Cualquier fallo real de Supabase/SMTP se
+// registra en el log del servidor, no se expone al cliente.
+export async function forgotPassword({ email }) {
+  const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/restablecer-password`;
+
+  try {
+    const { error } = await requestPasswordReset(email, redirectTo);
+    if (error) logger.warn('No se pudo enviar el correo de restablecimiento: ' + error.message);
+  } catch (err) {
+    logger.warn('No se pudo enviar el correo de restablecimiento: ' + err.message);
+  }
+
+  return { message: GENERIC_RESET_MESSAGE };
 }

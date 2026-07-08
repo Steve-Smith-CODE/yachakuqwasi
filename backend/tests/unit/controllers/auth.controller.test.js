@@ -1,4 +1,4 @@
-import { register, login } from '../../../src/controllers/auth.controller.js';
+import { register, login, forgotPassword } from '../../../src/controllers/auth.controller.js';
 import { createRealUser, cleanupCreatedUsers, trackUserForCleanup, uniqueEmail } from '../../helpers/testData.js';
 
 afterAll(async () => {
@@ -53,6 +53,17 @@ describe('Auth Controller (Supabase local real)', () => {
       const body = res.json.mock.calls[0][0];
       expect(body.token).toEqual(expect.any(String));
       expect(body.user.name).toBe('Login Controller');
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('responde con el mensaje generico de confirmacion', async () => {
+      req.body = { email: uniqueEmail('ctrl-forgot') };
+
+      await forgotPassword(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.message).toMatch(/restablecer tu contraseña/i);
     });
   });
 });
