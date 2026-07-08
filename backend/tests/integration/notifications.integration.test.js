@@ -113,4 +113,31 @@ describe('Notifications Integration (Supabase local real)', () => {
     const res = await request(app).get('/api/notificaciones');
     expect(res.status).toBe(401);
   });
+
+  it('marcar todas como leidas deja el unreadCount en 0', async () => {
+    const admin = await createRealUser({ role: 'admin' });
+    const landlord = await createRealUser({ role: 'landlord' });
+    const adminToken = await loginAndGetToken(admin);
+    const landlordToken = await loginAndGetToken(landlord);
+
+    await publishListing(landlordToken);
+    await publishListing(landlordToken);
+
+    const before = await request(app).get('/api/notificaciones').set('Authorization', `Bearer ${adminToken}`);
+    expect(before.body.unreadCount).toBeGreaterThan(0);
+
+    const readAllRes = await request(app)
+      .put('/api/notificaciones/leer-todas')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(readAllRes.status).toBe(200);
+    expect(readAllRes.body).toEqual({ message: 'Notificaciones marcadas como leídas' });
+
+    const after = await request(app).get('/api/notificaciones').set('Authorization', `Bearer ${adminToken}`);
+    expect(after.body.unreadCount).toBe(0);
+  });
+
+  it('rechaza marcar todas como leidas sin token', async () => {
+    const res = await request(app).put('/api/notificaciones/leer-todas');
+    expect(res.status).toBe(401);
+  });
 });

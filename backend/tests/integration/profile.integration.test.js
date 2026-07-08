@@ -15,6 +15,21 @@ const TINY_PNG_BASE64 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 describe('Profile Integration (Supabase local real)', () => {
+  it('GET /api/perfil devuelve el perfil real del usuario autenticado', async () => {
+    const student = await createRealUser({ role: 'student' });
+    const token = await loginAndGetToken(student);
+
+    const res = await request(app).get('/api/perfil').set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.profile.id).toBe(student.id);
+  });
+
+  it('GET /api/perfil rechaza peticiones sin token', async () => {
+    const res = await request(app).get('/api/perfil');
+    expect(res.status).toBe(401);
+  });
+
   it('debe actualizar nombre y telefono del propio perfil', async () => {
     const student = await createRealUser({ role: 'student' });
     const token = await loginAndGetToken(student);

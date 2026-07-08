@@ -11,6 +11,7 @@ import {
   getAuditLogs
 } from '../../../src/services/admin.service.js';
 import * as adminRepo from '../../../src/repositories/admin.repository.js';
+import * as notificationsService from '../../../src/services/notifications.service.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -173,6 +174,21 @@ describe('Admin Service (Supabase local real)', () => {
       await expect(updateHousingStatus('esto-no-es-un-uuid', { estado: 'approved' })).rejects.toMatchObject({
         statusCode: 400
       });
+    });
+
+    it('no lanza error si falla la notificacion al arrendador (solo se registra en el log)', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await insertPendingHousing(landlord.id);
+
+      const originalFn = notificationsService.notifyLandlordOfHousingReview;
+      notificationsService.notifyLandlordOfHousingReview = jest.fn().mockRejectedValue(new Error('Notify failed'));
+
+      try {
+        const approved = await updateHousingStatus(listing.id, { estado: 'approved' });
+        expect(approved.status).toBe('approved');
+      } finally {
+        notificationsService.notifyLandlordOfHousingReview = originalFn;
+      }
     });
 
     it('usa el housingId en los detalles del log si el repositorio no devuelve datos', async () => {

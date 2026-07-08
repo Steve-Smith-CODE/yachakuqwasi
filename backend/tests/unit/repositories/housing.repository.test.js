@@ -1,4 +1,4 @@
-import { findApprovedHousings, findHousingsByLandlord } from '../../../src/repositories/housing.repository.js';
+import { findApprovedHousings, findHousingsByLandlord, findApprovedHousingById } from '../../../src/repositories/housing.repository.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -81,6 +81,29 @@ describe('housing.repository (Supabase local real)', () => {
       const { data } = await findApprovedHousings({ barrio: 'Santa Ana', page: -3 });
 
       expect(data.map((l) => l.id)).toContain(listing.id);
+    });
+  });
+
+  describe('findApprovedHousingById', () => {
+    it('devuelve la publicacion aprobada con el nombre del arrendador', async () => {
+      const landlord = await createRealUser({ role: 'landlord', name: 'Arrendador Detalle' });
+      const listing = await insertApprovedListing(landlord.id, { title: 'Detalle por id' });
+
+      const { data, error } = await findApprovedHousingById(listing.id);
+
+      expect(error).toBeNull();
+      expect(data.id).toBe(listing.id);
+      expect(data.profiles?.name).toBe('Arrendador Detalle');
+    });
+
+    it('devuelve error si la publicacion no esta aprobada', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const pending = await insertApprovedListing(landlord.id, { title: 'Pendiente por id', status: 'pending' });
+
+      const { data, error } = await findApprovedHousingById(pending.id);
+
+      expect(data).toBeNull();
+      expect(error).toBeDefined();
     });
   });
 

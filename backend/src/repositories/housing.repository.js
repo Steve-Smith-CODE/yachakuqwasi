@@ -17,7 +17,7 @@ export function findApprovedHousings({ tipo, precioMax, barrio, page = 1, limit 
 
   let query = supabaseAdmin
     .from('housing_listings')
-    .select('*')
+    .select('*, profiles!housing_listings_landlord_id_fkey(name)')
     .eq('status', 'approved')
     .order('created_at', { ascending: false })
     .range(from, to);
@@ -31,6 +31,17 @@ export function findApprovedHousings({ tipo, precioMax, barrio, page = 1, limit 
 
 export function findHousingById(id) {
   return supabaseAdmin.from('housing_listings').select('*').eq('id', id).single();
+}
+
+// Para la pagina de detalle publica (compartible por URL): solo publicaciones
+// aprobadas, con el nombre del arrendador para mostrarlo en la ficha.
+export function findApprovedHousingById(id) {
+  return supabaseAdmin
+    .from('housing_listings')
+    .select('*, profiles!housing_listings_landlord_id_fkey(name)')
+    .eq('id', id)
+    .eq('status', 'approved')
+    .single();
 }
 
 export function findHousingsByLandlord(landlordId) {

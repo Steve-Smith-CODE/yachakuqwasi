@@ -1,4 +1,4 @@
-import { createHousing, listHousings, listMyHousings, addHousingImages } from '../../../src/services/housing.service.js';
+import { createHousing, listHousings, listMyHousings, addHousingImages, getHousingById } from '../../../src/services/housing.service.js';
 import * as housingRepo from '../../../src/repositories/housing.repository.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
@@ -174,6 +174,46 @@ describe('Housing Service (Supabase local real)', () => {
       } finally {
         housingRepo.findHousingsByLandlord = originalFn;
       }
+    });
+  });
+
+  describe('getHousingById', () => {
+    it('devuelve la publicacion aprobada real por id', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await createHousing(landlord.id, {
+        title: 'Detalle service real',
+        pricePen: 300,
+        distanceToUnschMinutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. Detalle 1',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+      await supabaseAdmin.from('housing_listings').update({ status: 'approved' }).eq('id', listing.id);
+
+      const result = await getHousingById(listing.id);
+
+      expect(result.id).toBe(listing.id);
+    });
+
+    it('lanza error 404 si no existe', async () => {
+      const fakeId = '00000000-0000-0000-0000-000000000000';
+      await expect(getHousingById(fakeId)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('lanza error 404 si la publicacion existe pero no esta aprobada', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await createHousing(landlord.id, {
+        title: 'Pendiente service real',
+        pricePen: 300,
+        distanceToUnschMinutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. Pendiente 1',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      await expect(getHousingById(listing.id)).rejects.toMatchObject({ statusCode: 404 });
     });
   });
 

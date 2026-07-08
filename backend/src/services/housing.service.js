@@ -2,6 +2,7 @@ import {
   insertHousing,
   findApprovedHousings,
   findHousingById,
+  findApprovedHousingById,
   updateHousingImages,
   findHousingsByLandlord
 } from '../repositories/housing.repository.js';
@@ -107,6 +108,16 @@ export async function listHousings(filters = {}) {
     const err = new Error(error.message);
     err.statusCode = 500;
     throw err;
+  }
+
+  return data;
+}
+
+export async function getHousingById(id) {
+  const { data, error } = await findApprovedHousingById(id);
+
+  if (error || !data) {
+    throw new NotFoundError('Alojamiento');
   }
 
   return data;

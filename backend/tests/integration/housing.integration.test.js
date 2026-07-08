@@ -102,4 +102,36 @@ describe('Housing Integration (Supabase local real)', () => {
     expect(res.status).toBe(200);
     expect(res.body.map((l) => l.id)).toContain(approved.id);
   });
+
+  it('debe devolver el detalle de una publicacion aprobada real sin requerir autenticacion', async () => {
+    const landlord = await createRealUser({ role: 'landlord' });
+    const { data: approved } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlord.id,
+        title: 'Detalle integration',
+        price_pen: 260,
+        distance_to_unsch_minutes: 9,
+        neighborhood: 'Santa Ana',
+        address: 'Jr. Detalle Integration 1',
+        contact_phone: '900000000',
+        type: 'room',
+        status: 'approved'
+      })
+      .select()
+      .single();
+    createdListingIds.push(approved.id);
+
+    const res = await request(app).get(`/api/housings/${approved.id}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(approved.id);
+  });
+
+  it('debe devolver 404 si la publicacion no existe o no esta aprobada', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000';
+    const res = await request(app).get(`/api/housings/${fakeId}`);
+
+    expect(res.status).toBe(404);
+  });
 });

@@ -5,7 +5,7 @@ import { updateProfileRequest, updatePasswordRequest, uploadAvatarRequest } from
 import { ApiError } from "../api/client.js";
 import { fileToDataUrl } from "../utils/files.js";
 import { UNSCH_ACADEMIC_MAP, FACULTIES } from "../constants/content.js";
-import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
+import makiMascot from "../assets/images/maki-mascota.webp";
 
 const ROLE_LABEL = { student: "Estudiante", landlord: "Arrendador", admin: "Administrador" };
 

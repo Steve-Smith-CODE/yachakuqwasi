@@ -1,9 +1,10 @@
 import { Heart, MapPin, Clock, Phone } from "lucide-react";
-import { TYPE_LABEL } from "../constants/content.js";
+import { TYPE_LABEL, TYPE_ACCENT } from "../constants/content.js";
 import { getPlaceholderImage } from "../constants/placeholderImages.js";
 
 export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavorite }) {
   const image = listing.images?.[0] || getPlaceholderImage(listing.type, listing.id);
+  const accent = TYPE_ACCENT[listing.type] || TYPE_ACCENT.room;
   const waNumber = (listing.contact_phone || "").replace(/\D/g, "");
   const waText = encodeURIComponent(
     `Hola, vengo del portal YachakuqWasi y estoy muy interesado en su alojamiento en ${listing.neighborhood} (${listing.address}). ¿Sigue disponible?`
@@ -27,7 +28,7 @@ export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavor
               Maki Verificado
             </span>
           )}
-          <span className="bg-guindo text-white text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide w-fit">
+          <span className={`${accent.badge} text-white text-[9px] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wide w-fit shadow-sm`}>
             {TYPE_LABEL[listing.type] || listing.type}
           </span>
         </div>

@@ -5,15 +5,36 @@ import { supabaseAdmin } from '../src/config/supabase.js';
 // (ver backend/database/maintenance.sql) con permisos solo para service_role.
 const STORAGE_BUCKETS = ['housing-images', 'verification-docs'];
 
-async function emptyBucket(bucket) {
-  const { data: files, error } = await supabaseAdmin.storage.from(bucket).list();
+// list() solo devuelve el nivel indicado por `prefix`; las subidas reales
+// quedan anidadas (ej. housing-images/<slug>/0.webp), asi que hay que bajar
+// recursivamente por cada "carpeta" (entradas con id: null) para juntar las
+// rutas completas de archivo antes de poder borrarlas.
+async function collectFilePaths(bucket, prefix = '') {
+  const { data: entries, error } = await supabaseAdmin.storage.from(bucket).list(prefix, { limit: 1000 });
   if (error) {
-    console.warn(`No se pudo listar el bucket "${bucket}": ${error.message}`);
-    return;
+    console.warn(`No se pudo listar "${bucket}/${prefix}": ${error.message}`);
+    return [];
   }
-  if (files && files.length > 0) {
-    const fileNames = files.map((f) => f.name);
-    await supabaseAdmin.storage.from(bucket).remove(fileNames);
+
+  const paths = [];
+  for (const entry of entries || []) {
+    const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.id === null) {
+      paths.push(...(await collectFilePaths(bucket, fullPath)));
+    } else {
+      paths.push(fullPath);
+    }
+  }
+  return paths;
+}
+
+async function emptyBucket(bucket) {
+  const filePaths = await collectFilePaths(bucket);
+  if (filePaths.length === 0) return;
+
+  const { error } = await supabaseAdmin.storage.from(bucket).remove(filePaths);
+  if (error) {
+    console.warn(`No se pudo vaciar completamente el bucket "${bucket}": ${error.message}`);
   }
 }
 

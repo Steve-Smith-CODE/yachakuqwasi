@@ -81,6 +81,17 @@ export const TYPE_OPTIONS = [
 
 export const TYPE_LABEL = { room: "Habitación", apartment: "Departamento", shared: "Compartido", family: "Familiar" };
 
+// Un color vivo distinto por tipo de alojamiento, reutilizado en la tarjeta
+// del explorador y en la ventana de detalle para que el tipo se reconozca
+// de un vistazo. Clases completas (no compuestas en runtime) para que
+// Tailwind las detecte al escanear el codigo.
+export const TYPE_ACCENT = {
+  room: { badge: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-700", icon: "text-emerald-600" },
+  apartment: { badge: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-700", icon: "text-indigo-600" },
+  shared: { badge: "bg-violet-500", chip: "bg-violet-50 text-violet-700", icon: "text-violet-600" },
+  family: { badge: "bg-amber-500", chip: "bg-amber-50 text-amber-700", icon: "text-amber-600" }
+};
+
 export const UNSCH_ACADEMIC_MAP = {
   "Facultad de Ingeniería de Minas, Geología y Metalurgia": [
     "Ingeniería de Sistemas",

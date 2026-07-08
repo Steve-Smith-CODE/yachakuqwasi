@@ -1,4 +1,4 @@
-import { create, list, mine } from '../../../src/controllers/housing.controller.js';
+import { create, list, mine, show } from '../../../src/controllers/housing.controller.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
@@ -87,5 +87,30 @@ describe('Housing Controller (Supabase local real)', () => {
 
     const body = res.json.mock.calls[0][0];
     expect(body.map((l) => l.id)).toContain(listing.id);
+  });
+
+  it('show devuelve la publicacion aprobada real por id', async () => {
+    const landlord = await createRealUser({ role: 'landlord' });
+    const { data: listing } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlord.id,
+        title: 'Show controller real',
+        price_pen: 260,
+        distance_to_unsch_minutes: 7,
+        neighborhood: 'San Blas',
+        address: 'Jr. Show 1',
+        contact_phone: '900000000',
+        status: 'approved'
+      })
+      .select()
+      .single();
+    createdListingIds.push(listing.id);
+
+    req.params = { id: listing.id };
+    await show(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.id).toBe(listing.id);
   });
 });
