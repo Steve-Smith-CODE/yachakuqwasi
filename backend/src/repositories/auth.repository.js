@@ -16,3 +16,7 @@ export function signInWithPassword({ email, password }) {
 export function findProfileById(id) {
   return supabaseAdmin.from('profiles').select('*').eq('id', id).single();
 }
+
+export function updateAuthPassword(userId, password) {
+  return supabaseAdmin.auth.admin.updateUserById(userId, { password });
+}

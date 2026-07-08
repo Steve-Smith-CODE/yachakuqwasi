@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { createHousingRequest, uploadHousingImagesRequest } from "../api/housings.js";
 import { ApiError } from "../api/client.js";
 import { NEIGHBORHOODS } from "../constants/content.js";
+import { fileToDataUrl } from "../utils/files.js";
 
 const MAX_PHOTOS = 8;
 
@@ -12,21 +13,12 @@ const initialForm = {
   type: "room",
   pricePen: 250,
   distanceToUnschMinutes: 8,
-  neighborhood: "San Blas",
+  neighborhood: NEIGHBORHOODS[0],
   address: "",
   description: "",
   contactPhone: "",
   amenities: []
 };
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function PublishPage() {
   const { token } = useAuth();
@@ -168,7 +160,7 @@ export default function PublishPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1 text-left">
-                <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Barrio de Ayacucho</label>
+                <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Distrito (Huamanga)</label>
                 <select
                   value={form.neighborhood}
                   onChange={(e) => set("neighborhood", e.target.value)}

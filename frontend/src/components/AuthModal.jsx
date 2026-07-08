@@ -1,45 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Mail, Lock, User, X } from "lucide-react";
+import { Mail, Lock, User, X, LogIn, UserPlus, Loader2, ArrowRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { ApiError } from "../api/client.js";
+import { UNSCH_ACADEMIC_MAP, FACULTIES } from "../constants/content.js";
 import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
-
-const UNSCH_ACADEMIC_MAP = {
-  "Facultad de Ingeniería de Minas, Geología y Metalurgia": [
-    "Ingeniería de Sistemas",
-    "Ingeniería de Minas",
-    "Ingeniería Civil"
-  ],
-  "Facultad de Ingeniería Química y Metalurgia": [
-    "Ingeniería Química",
-    "Ingeniería en Industrias Alimentarias",
-    "Ingeniería Agroindustrial"
-  ],
-  "Facultad de Ciencias de la Salud": ["Medicina Humana", "Enfermería", "Obstetricia"],
-  "Facultad de Ciencias Biológicas": ["Biología", "Farmacia y Bioquímica"],
-  "Facultad de Ciencias Agrarias": ["Agronomía", "Ingeniería Agrícola", "Medicina Veterinaria"],
-  "Facultad de Ciencias Sociales": [
-    "Arqueología e Historia",
-    "Trabajo Social",
-    "Antropología Social",
-    "Ciencias de la Comunicación"
-  ],
-  "Facultad de Ciencias de la Educación": [
-    "Educación Inicial",
-    "Educación Primaria",
-    "Educación Secundaria",
-    "Educación Física"
-  ],
-  "Facultad de Derecho y Ciencias Políticas": ["Derecho"],
-  "Facultad de Ciencias Económicas, Administrativas y Contables": [
-    "Administración de Empresas",
-    "Contabilidad",
-    "Economía"
-  ]
-};
-
-const FACULTIES = Object.keys(UNSCH_ACADEMIC_MAP);
 
 export default function AuthModal() {
   const { authModal, closeAuthModal, login, register } = useAuth();
@@ -122,24 +87,43 @@ export default function AuthModal() {
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative z-10 border border-slate-100 overflow-y-auto max-h-[92vh]"
+            className="bg-white rounded-3xl max-w-md w-full shadow-2xl relative z-10 border border-guindo/10 overflow-y-auto max-h-[92vh]"
           >
-            <div className="text-center space-y-3 mb-6">
-              <div className="relative h-16 w-16 mx-auto">
-                <div className="h-16 w-16 rounded-full border-2 border-guindo/20 bg-[#FDFBF7] shadow-md overflow-hidden flex items-center justify-center p-0.5">
-                  <img src={makiMascot} alt="Maki la mascota" className="w-full h-full object-cover rounded-full" />
-                </div>
-                <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
-              </div>
-              <h3 className="text-xl font-extrabold text-[#3b0d0d] tracking-tight">
-                {localMode === "login" ? "Iniciar Sesión con Maki" : "Crear Cuenta con Maki"}
-              </h3>
-              <p className="text-slate-400 text-xs">
-                {localMode === "login"
-                  ? "Ingresa para gestionar tus favoritos y hablar con Maki"
-                  : "Regístrate en YachakuqWasi de forma totalmente gratuita"}
-              </p>
+            <div
+              className="relative h-24 rounded-t-3xl overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, #7a1c1c 0%, #581212 60%, #2a0808 100%)",
+                backgroundImage:
+                  "repeating-linear-gradient(45deg, rgba(255,215,0,.09) 0 2px, transparent 2px 14px), repeating-linear-gradient(-45deg, rgba(255,215,0,.09) 0 2px, transparent 2px 14px), linear-gradient(135deg, #7a1c1c 0%, #581212 60%, #2a0808 100%)"
+              }}
+            >
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-dorado" />
             </div>
+
+            <button
+              onClick={handleClose}
+              className="absolute top-4 right-4 text-white/70 hover:text-white p-1 rounded-lg transition-colors cursor-pointer z-10"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="px-6 sm:px-8 pb-6 sm:pb-8">
+              <div className="text-center space-y-3 mb-6">
+                <div className="relative h-20 w-20 mx-auto -mt-10">
+                  <div className="h-20 w-20 rounded-full border-4 border-white bg-[#FDFBF7] shadow-xl overflow-hidden flex items-center justify-center">
+                    <img src={makiMascot} alt="Maki la mascota" className="w-full h-full object-cover rounded-full" />
+                  </div>
+                  <span className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
+                </div>
+                <h3 className="font-display text-xl font-extrabold text-[#3b0d0d] tracking-tight">
+                  {localMode === "login" ? "Iniciar Sesión con Maki" : "Crear Cuenta con Maki"}
+                </h3>
+                <p className="text-slate-400 text-xs">
+                  {localMode === "login"
+                    ? "Ingresa para gestionar tus favoritos y hablar con Maki"
+                    : "Regístrate en YachakuqWasi de forma totalmente gratuita"}
+                </p>
+              </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
@@ -155,15 +139,15 @@ export default function AuthModal() {
 
               {localMode === "signup" && (
                 <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Nombre Completo</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                  <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Nombre Completo</label>
+                  <div className="relative group">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-guindo transition-colors" />
                     <input
                       type="text"
                       placeholder="Ej. Juan Pérez Quispe"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-medium"
+                      className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-medium transition-all placeholder:text-slate-400"
                       required
                     />
                   </div>
@@ -171,30 +155,30 @@ export default function AuthModal() {
               )}
 
               <div className="space-y-1 text-left">
-                <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Correo Electrónico</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Correo Electrónico</label>
+                <div className="relative group">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-guindo transition-colors" />
                   <input
                     type="email"
                     placeholder="ejemplo@unsch.edu.pe"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-medium"
+                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-medium transition-all placeholder:text-slate-400"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1 text-left">
-                <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Contraseña</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Contraseña</label>
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4 group-focus-within:text-guindo transition-colors" />
                   <input
                     type="password"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-medium"
+                    className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-medium transition-all placeholder:text-slate-400"
                     required
                   />
                 </div>
@@ -204,11 +188,11 @@ export default function AuthModal() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1 text-left">
-                      <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Tipo de Usuario</label>
+                      <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Tipo de Usuario</label>
                       <select
                         value={role}
                         onChange={(e) => setRole(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-bold text-slate-700 cursor-pointer"
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-bold text-slate-700 cursor-pointer transition-all"
                       >
                         <option value="student">Estudiante</option>
                         <option value="landlord">Arrendador</option>
@@ -216,13 +200,13 @@ export default function AuthModal() {
                     </div>
 
                     <div className="space-y-1 text-left">
-                      <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Teléfono Móvil</label>
+                      <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Teléfono Móvil</label>
                       <input
                         type="tel"
                         placeholder="Ej. 966123456"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-medium"
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-medium transition-all placeholder:text-slate-400"
                       />
                     </div>
                   </div>
@@ -230,7 +214,7 @@ export default function AuthModal() {
                   {role === "student" && (
                     <div className="space-y-3">
                       <div className="space-y-1 text-left">
-                        <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Facultad Académica (UNSCH)</label>
+                        <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Facultad Académica (UNSCH)</label>
                         <select
                           value={faculty}
                           onChange={(e) => {
@@ -239,7 +223,7 @@ export default function AuthModal() {
                             const relatedCareers = UNSCH_ACADEMIC_MAP[selectedFac] || [];
                             if (relatedCareers.length > 0) setCareer(relatedCareers[0]);
                           }}
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-bold text-slate-700 cursor-pointer"
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-bold text-slate-700 cursor-pointer transition-all"
                         >
                           {FACULTIES.map((f) => (
                             <option key={f} value={f}>{f}</option>
@@ -248,11 +232,11 @@ export default function AuthModal() {
                       </div>
 
                       <div className="space-y-1 text-left">
-                        <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Carrera Profesional</label>
+                        <label className="text-[10px] font-black tracking-widest text-plomo-dark/80 uppercase block mb-1">Carrera Profesional</label>
                         <select
                           value={career}
                           onChange={(e) => setCareer(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-bold text-slate-700 cursor-pointer"
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo/25 focus:border-guindo text-xs bg-white shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] font-bold text-slate-700 cursor-pointer transition-all"
                         >
                           {(UNSCH_ACADEMIC_MAP[faculty] || []).map((c) => (
                             <option key={c} value={c}>{c}</option>
@@ -264,35 +248,43 @@ export default function AuthModal() {
                 </>
               )}
 
-              <button
+              <motion.button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-guindo text-white py-3 rounded-xl text-xs font-black hover:bg-guindo-dark transition-all shadow-md uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer mt-2 disabled:opacity-50"
+                whileHover={{ scale: loading ? 1 : 1.015 }}
+                whileTap={{ scale: loading ? 1 : 0.98 }}
+                className="btn-shine relative w-full text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_8px_20px_-6px_rgba(122,28,28,0.55)]"
+                style={{ background: "linear-gradient(135deg, #9b2d2d 0%, #7a1c1c 55%, #4a0e0e 100%)" }}
               >
+                <span className="absolute inset-x-0 top-0 h-1/2 bg-white/10 pointer-events-none" />
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : localMode === "login" ? (
+                  <LogIn className="h-4 w-4 text-dorado" />
+                ) : (
+                  <UserPlus className="h-4 w-4 text-dorado" />
+                )}
                 <span>{loading ? "Procesando..." : localMode === "login" ? "Ingresar" : "Registrar Datos"}</span>
-              </button>
+              </motion.button>
             </form>
 
-            <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500 mt-6">
-              <span>{localMode === "login" ? "¿No tienes una cuenta aún?" : "¿Ya estás registrado en YachakuqWasi?"}</span>{" "}
+            <div className="pt-5 border-t border-slate-100 text-center mt-6 space-y-2.5">
+              <p className="text-xs text-slate-500">
+                {localMode === "login" ? "¿No tienes una cuenta aún?" : "¿Ya estás registrado en YachakuqWasi?"}
+              </p>
               <button
                 onClick={() => {
                   setError("");
                   setSuccess("");
                   setLocalMode(localMode === "login" ? "signup" : "login");
                 }}
-                className="text-guindo font-black underline hover:text-guindo-dark cursor-pointer ml-1"
+                className="w-full flex items-center justify-center gap-1.5 border-2 border-guindo/25 text-guindo text-xs font-black py-2.5 rounded-xl hover:bg-guindo/5 hover:border-guindo/40 transition-all cursor-pointer group"
               >
-                {localMode === "login" ? "Crear cuenta ahora" : "Inicia sesión aquí"}
+                <span>{localMode === "login" ? "Crear cuenta ahora" : "Inicia sesión aquí"}</span>
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
-
-            <button
-              onClick={handleClose}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            </div>
           </motion.div>
         </div>
       )}

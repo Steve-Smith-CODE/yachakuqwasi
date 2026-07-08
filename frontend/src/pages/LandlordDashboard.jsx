@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { Home, ShieldCheck, MessageCircle, Send, Plus, Clock } from "lucide-react";
+import { Home, ShieldCheck, MessageCircle, Send, Plus, Clock, Layers, Heart, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { listMyHousingsRequest } from "../api/housings.js";
 import { listChatsRequest, getMessagesRequest, sendMessageRequest } from "../api/chat.js";
 import { submitVerificationRequest } from "../api/verification.js";
+import { getLandlordStatsRequest } from "../api/stats.js";
+import { getPlaceholderImage } from "../constants/placeholderImages.js";
+import { fileToDataUrl } from "../utils/files.js";
+import StatCard from "../components/StatCard.jsx";
 
 const STATUS_LABEL = {
   approved: { label: "Activo", className: "bg-emerald-100 text-emerald-800" },
@@ -12,15 +16,6 @@ const STATUS_LABEL = {
   suspended: { label: "Suspendido", className: "bg-red-100 text-red-800" },
   flagged: { label: "Observado", className: "bg-red-100 text-red-800" }
 };
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function LandlordDashboard() {
   const { token, user } = useAuth();
@@ -34,6 +29,7 @@ export default function LandlordDashboard() {
 
   const [verificationStatus, setVerificationStatus] = useState(user?.verification_status || "none");
   const [uploading, setUploading] = useState(false);
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     listMyHousingsRequest(token)
@@ -47,6 +43,8 @@ export default function LandlordDashboard() {
         if (data.length > 0) setActiveChatId(data[0].id);
       })
       .catch(() => {});
+
+    getLandlordStatsRequest(token).then(setStats).catch(() => {});
   }, [token]);
 
   useEffect(() => {
@@ -88,45 +86,39 @@ export default function LandlordDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm text-left">
-          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Mis Anuncios Activos</span>
-          <span className="text-2xl font-black text-slate-900 mt-1 block font-mono">{approvedListings.length}</span>
-          <span className="text-[10px] text-slate-500 mt-0.5 block">
-            {listings.filter((l) => l.status === "pending").length} en cola de aprobación
-          </span>
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <StatCard
+          icon={Home}
+          label="Mis Anuncios Activos"
+          value={stats ? stats.listingsByStatus.approved || 0 : approvedListings.length}
+          hint={`${stats ? stats.listingsByStatus.pending || 0 : listings.filter((l) => l.status === "pending").length} en cola de aprobación`}
+        />
+        <StatCard icon={Layers} label="Total de Anuncios" value={stats ? stats.totalListings : listings.length} />
+        <StatCard
+          label="Recaudación Estimada"
+          value={`S/. ${totalEarnings}`}
+          hint="Suma mensual de anuncios activos"
+          tone="guindo"
+        />
+        <StatCard icon={Heart} label="Favoritos Recibidos" value={stats?.favoritesReceived ?? "—"} tone="guindo" />
+        <StatCard icon={Users} label="Contactos Recibidos" value={stats?.contactsReceived ?? "—"} tone="guindo" />
 
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm text-left">
-          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Recaudación Estimada</span>
-          <span className="text-2xl font-black text-guindo mt-1 block font-mono">S/. {totalEarnings} PEN</span>
-          <span className="text-[10px] text-slate-500 mt-0.5 block">Suma mensual de anuncios activos</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm text-left">
-          <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Total de Anuncios</span>
-          <span className="text-2xl font-black text-slate-900 mt-1 block font-mono">{listings.length}</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Verificación</span>
-            {isApproved ? (
-              <span className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-1 flex items-center gap-1">
-                <ShieldCheck className="h-4.5 w-4.5 text-emerald-500 shrink-0" /> <span>Verificado</span>
-              </span>
-            ) : verificationStatus === "pending" ? (
-              <span className="text-xs font-black text-sky-600 uppercase tracking-widest mt-1 flex items-center gap-1">
-                <Clock className="h-4 w-4 animate-spin" /> <span>En revisión</span>
-              </span>
-            ) : (
-              <label className="mt-1 flex items-center gap-1.5 text-[10px] font-black text-guindo cursor-pointer underline">
-                <span>{uploading ? "Subiendo..." : "Subir DNI/Título"}</span>
-                <input type="file" accept="image/*" className="hidden" onChange={handleUploadDoc} disabled={uploading} />
-              </label>
-            )}
-          </div>
-        </div>
+        <StatCard label="Verificación">
+          {isApproved ? (
+            <span className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-1 flex items-center gap-1">
+              <ShieldCheck className="h-4.5 w-4.5 text-emerald-500 shrink-0" /> <span>Verificado</span>
+            </span>
+          ) : verificationStatus === "pending" ? (
+            <span className="text-xs font-black text-sky-600 uppercase tracking-widest mt-1 flex items-center gap-1">
+              <Clock className="h-4 w-4 animate-spin" /> <span>En revisión</span>
+            </span>
+          ) : (
+            <label className="mt-1 flex items-center gap-1.5 text-[10px] font-black text-guindo cursor-pointer underline">
+              <span>{uploading ? "Subiendo..." : "Subir DNI/Título"}</span>
+              <input type="file" accept="image/*" className="hidden" onChange={handleUploadDoc} disabled={uploading} />
+            </label>
+          )}
+        </StatCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -161,7 +153,11 @@ export default function LandlordDashboard() {
                 return (
                   <div key={room.id} className="border border-slate-200 rounded-2xl p-4 space-y-3 text-left bg-slate-50/20">
                     <div className="h-28 rounded-xl overflow-hidden bg-slate-100 relative">
-                      {room.images?.[0] && <img src={room.images[0]} alt={room.title} className="w-full h-full object-cover" />}
+                      <img
+                        src={room.images?.[0] || getPlaceholderImage(room.type, room.id)}
+                        alt={room.title}
+                        className="w-full h-full object-cover"
+                      />
                       <span className={`absolute top-2.5 left-2.5 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow ${status.className}`}>
                         {status.label}
                       </span>

@@ -1,24 +1,15 @@
 import { useEffect, useState } from "react";
-import { MessageCircle, ShieldCheck, Clock, Lock, Heart, Calculator, Users, Plus, Send } from "lucide-react";
+import { MessageCircle, ShieldCheck, Clock, Lock, Heart, Calculator, Plus, Send } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { listChatsRequest, getMessagesRequest, sendMessageRequest } from "../api/chat.js";
 import { listFavoritesRequest } from "../api/favorites.js";
 import { submitVerificationRequest } from "../api/verification.js";
-import { getCompatibilityRequest } from "../api/roommates.js";
-import { ApiError } from "../api/client.js";
+import { getStudentStatsRequest } from "../api/stats.js";
+import { getPlaceholderImage } from "../constants/placeholderImages.js";
+import { fileToDataUrl } from "../utils/files.js";
+import StatCard from "../components/StatCard.jsx";
 import unschLogoIcon from "../assets/images/unsch_logo_icon_new_1782937711905.jpg";
 import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
-
-const initialLifestyle = { fumador: false, mascotas: false, horario: "diurno", presupuestoMax: 300 };
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export default function StudentDashboard() {
   const { token, user } = useAuth();
@@ -30,6 +21,7 @@ export default function StudentDashboard() {
   const [chatsLoading, setChatsLoading] = useState(true);
 
   const [favorites, setFavorites] = useState([]);
+  const [stats, setStats] = useState(null);
 
   const [verificationStatus, setVerificationStatus] = useState(user?.verification_status || "none");
   const [uploading, setUploading] = useState(false);
@@ -43,11 +35,6 @@ export default function StudentDashboard() {
   const circumference = 2 * Math.PI * 30;
   const strokeDashoffset = circumference - (percentageUsed / 100) * circumference;
 
-  const [myProfile, setMyProfile] = useState(initialLifestyle);
-  const [candidateProfile, setCandidateProfile] = useState(initialLifestyle);
-  const [compatResult, setCompatResult] = useState(null);
-  const [compatLoading, setCompatLoading] = useState(false);
-
   useEffect(() => {
     listChatsRequest(token)
       .then((data) => {
@@ -60,6 +47,8 @@ export default function StudentDashboard() {
     listFavoritesRequest(token)
       .then(setFavorites)
       .catch(() => {});
+
+    getStudentStatsRequest(token).then(setStats).catch(() => {});
   }, [token]);
 
   useEffect(() => {
@@ -96,30 +85,22 @@ export default function StudentDashboard() {
     }
   }
 
-  async function handleCompatibility(e) {
-    e.preventDefault();
-    setCompatLoading(true);
-    setCompatResult(null);
-    try {
-      const res = await getCompatibilityRequest(token, myProfile, candidateProfile);
-      setCompatResult(res.score);
-    } catch (err) {
-      setCompatResult(err instanceof ApiError ? { error: err.message } : { error: "No se pudo calcular." });
-    } finally {
-      setCompatLoading(false);
-    }
-  }
-
   const activeChat = chats.find((c) => c.id === activeChatId);
   const isApproved = user?.is_verified || verificationStatus === "approved";
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4">
+        <StatCard icon={Heart} label="Favoritos Guardados" value={stats?.savedFavorites ?? favorites.length} tone="guindo" />
+        <StatCard icon={MessageCircle} label="Chats Activos" value={stats?.activeChats ?? chats.length} tone="guindo" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       <div className="lg:col-span-4 space-y-6">
         <div className="bg-gradient-to-br from-guindo via-guindo-dark to-[#300a0a] rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border-2 border-amber-500/20">
           <div className="flex justify-between items-start">
             <div>
-              <span className="text-[9px] font-black tracking-widest text-[#FFC000] uppercase block font-mono">CREDENCIAL UNIVERSITARIA</span>
+              <span className="text-[9px] font-black tracking-widest text-dorado-dark uppercase block font-mono">CREDENCIAL UNIVERSITARIA</span>
               <span className="text-[10px] text-slate-300 font-bold block mt-0.5">UNSCH • Ayacucho</span>
             </div>
             <div className="h-9 w-9 rounded-lg overflow-hidden bg-white/10 p-0.5 border border-white/10">
@@ -128,7 +109,7 @@ export default function StudentDashboard() {
           </div>
 
           <div className="flex gap-4 items-center mt-6 relative z-10">
-            <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-[#FFC000] bg-slate-50 shrink-0 shadow">
+            <div className="h-16 w-16 rounded-2xl overflow-hidden border-2 border-dorado-dark bg-slate-50 shrink-0 shadow">
               <img src={makiMascot} alt="Estudiante UNSCH" className="w-full h-full object-cover" />
             </div>
             <div className="space-y-1 overflow-hidden">
@@ -141,8 +122,8 @@ export default function StudentDashboard() {
             <div>
               <span className="text-[9px] text-slate-400 block font-bold font-mono">ESTADO DE IDENTIDAD</span>
               {isApproved ? (
-                <span className="text-[#FFC000] font-black text-[11px] uppercase tracking-wider flex items-center gap-1 mt-0.5">
-                  <ShieldCheck className="h-4 w-4 text-[#FFD700]" /> <span>Estudiante Verificado</span>
+                <span className="text-dorado-dark font-black text-[11px] uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                  <ShieldCheck className="h-4 w-4 text-dorado" /> <span>Estudiante Verificado</span>
                 </span>
               ) : verificationStatus === "pending" ? (
                 <span className="text-sky-300 font-bold text-[10px] uppercase tracking-wider flex items-center gap-1 mt-0.5">
@@ -265,7 +246,11 @@ export default function StudentDashboard() {
               {favorites.map((room) => (
                 <div key={room.id} className="border border-slate-100 rounded-2xl p-3 flex gap-3 items-center bg-slate-50/50">
                   <div className="h-14 w-14 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                    {room.images?.[0] && <img src={room.images[0]} alt={room.title} className="w-full h-full object-cover" />}
+                    <img
+                      src={room.images?.[0] || getPlaceholderImage(room.type, room.id)}
+                      alt={room.title}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div className="flex-1 overflow-hidden text-left space-y-0.5">
                     <h5 className="text-xs font-extrabold text-slate-800 truncate">{room.title}</h5>
@@ -312,83 +297,7 @@ export default function StudentDashboard() {
             </form>
           </div>
         )}
-
-        <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3.5">
-          <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-            <Users className="h-4.5 w-4.5 text-guindo" />
-            <span>Compatibilidad de Roommate</span>
-          </h4>
-
-          <form onSubmit={handleCompatibility} className="space-y-3 text-left bg-amber-50/20 border border-amber-200/50 p-3.5 rounded-2xl">
-            <p className="text-[10px] text-slate-500 font-bold uppercase">Tu perfil</p>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <label className="flex items-center gap-1.5 font-semibold text-slate-600">
-                <input type="checkbox" checked={myProfile.fumador} onChange={(e) => setMyProfile((p) => ({ ...p, fumador: e.target.checked }))} />
-                Fumador
-              </label>
-              <label className="flex items-center gap-1.5 font-semibold text-slate-600">
-                <input type="checkbox" checked={myProfile.mascotas} onChange={(e) => setMyProfile((p) => ({ ...p, mascotas: e.target.checked }))} />
-                Mascotas
-              </label>
-            </div>
-            <select
-              value={myProfile.horario}
-              onChange={(e) => setMyProfile((p) => ({ ...p, horario: e.target.value }))}
-              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-[10px] font-bold bg-white"
-            >
-              <option value="diurno">Horario diurno</option>
-              <option value="nocturno">Horario nocturno</option>
-            </select>
-            <input
-              type="number"
-              value={myProfile.presupuestoMax}
-              onChange={(e) => setMyProfile((p) => ({ ...p, presupuestoMax: Number(e.target.value) }))}
-              placeholder="Presupuesto máximo"
-              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-[10px]"
-            />
-
-            <p className="text-[10px] text-slate-500 font-bold uppercase pt-1">Perfil candidato</p>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-              <label className="flex items-center gap-1.5 font-semibold text-slate-600">
-                <input type="checkbox" checked={candidateProfile.fumador} onChange={(e) => setCandidateProfile((p) => ({ ...p, fumador: e.target.checked }))} />
-                Fumador
-              </label>
-              <label className="flex items-center gap-1.5 font-semibold text-slate-600">
-                <input type="checkbox" checked={candidateProfile.mascotas} onChange={(e) => setCandidateProfile((p) => ({ ...p, mascotas: e.target.checked }))} />
-                Mascotas
-              </label>
-            </div>
-            <select
-              value={candidateProfile.horario}
-              onChange={(e) => setCandidateProfile((p) => ({ ...p, horario: e.target.value }))}
-              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-[10px] font-bold bg-white"
-            >
-              <option value="diurno">Horario diurno</option>
-              <option value="nocturno">Horario nocturno</option>
-            </select>
-            <input
-              type="number"
-              value={candidateProfile.presupuestoMax}
-              onChange={(e) => setCandidateProfile((p) => ({ ...p, presupuestoMax: Number(e.target.value) }))}
-              placeholder="Presupuesto máximo"
-              className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-[10px]"
-            />
-
-            <button type="submit" disabled={compatLoading} className="w-full bg-guindo text-white text-[10px] font-black py-2 rounded-xl cursor-pointer disabled:opacity-50">
-              {compatLoading ? "Calculando..." : "Calcular Compatibilidad"}
-            </button>
-
-            {compatResult != null && (
-              <div className="bg-white p-2.5 rounded-xl text-center border border-slate-100">
-                {typeof compatResult === "object" ? (
-                  <span className="text-red-500 text-[10px] font-bold">{compatResult.error}</span>
-                ) : (
-                  <span className="text-guindo font-black text-lg font-mono">{Math.round(compatResult * 100)}% compatible</span>
-                )}
-              </div>
-            )}
-          </form>
-        </div>
+      </div>
       </div>
     </div>
   );

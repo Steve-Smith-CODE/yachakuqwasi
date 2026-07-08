@@ -14,6 +14,8 @@ import {
   insertAuditLog,
   findAuditLogs
 } from '../repositories/admin.repository.js';
+import { notifyLandlordOfHousingReview } from './notifications.service.js';
+import logger from '../config/logger.js';
 
 export async function getStats() {
   const [users, housings, pendingDocs] = await Promise.all([
@@ -95,6 +97,20 @@ export async function updateHousingStatus(housingId, { estado }, actor) {
     details: `Anuncio '${data?.title ?? housingId}' cambiado a estado '${estado}'.`,
     type: 'listing'
   });
+
+  try {
+    if (data) {
+      await notifyLandlordOfHousingReview({
+        landlordId: data.landlord_id,
+        listingId: data.id,
+        listingTitle: data.title,
+        estado,
+        actorId: actor?.id
+      });
+    }
+  } catch (err) {
+    logger.warn(`No se pudo notificar sobre el anuncio ${housingId}: ${err.message}`);
+  }
 
   return data;
 }

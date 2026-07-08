@@ -7,6 +7,7 @@ import {
 } from '../repositories/housing.repository.js';
 import { geocode } from './geocoding.service.js';
 import { uploadHousingImages } from './image.service.js';
+import { notifyAdminsOfNewHousing } from './notifications.service.js';
 import { NotFoundError, ForbiddenError, AppError } from '../errors/AppError.js';
 import logger from '../config/logger.js';
 
@@ -65,6 +66,12 @@ export async function createHousing(landlordId, data) {
     const err = new Error(error.message);
     err.statusCode = 400;
     throw err;
+  }
+
+  try {
+    await notifyAdminsOfNewHousing({ listingId: listing.id, listingTitle: listing.title, actorId: landlordId });
+  } catch (err) {
+    logger.warn(`No se pudo notificar a los admins de la publicación ${listing.id}: ${err.message}`);
   }
 
   return listing;

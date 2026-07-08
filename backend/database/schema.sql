@@ -21,6 +21,12 @@ create type housing_status as enum ('approved', 'pending', 'suspended', 'flagged
 create type chat_presence as enum ('online', 'offline');
 create type message_sender as enum ('student', 'landlord');
 create type audit_log_type as enum ('system', 'user', 'listing');
+create type notification_type as enum (
+  'listing_approved',
+  'listing_flagged',
+  'listing_suspended',
+  'listing_pending_review'
+);
 
 -- ------------------------------------------------------------
 -- Trigger genérico para mantener updated_at
@@ -50,6 +56,7 @@ create table profiles (
   verification_doc_url  text,
   blocked_until         timestamptz,
   blocked_reason        text,
+  avatar_url            text,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
@@ -208,6 +215,27 @@ create table audit_logs (
 create index idx_audit_created_desc on audit_logs (created_at desc);
 create index idx_audit_type on audit_logs (type);
 
+-- ------------------------------------------------------------
+-- TABLA: notifications
+-- Notificaciones dirigidas a un usuario (campanita en la navbar):
+-- una fila por destinatario (fan-out real), asi el estado de
+-- lectura es siempre por-usuario.
+-- ------------------------------------------------------------
+create table notifications (
+  id            uuid primary key default gen_random_uuid(),
+  recipient_id  uuid not null references profiles (id) on delete cascade,
+  actor_id      uuid references profiles (id) on delete set null,
+  type          notification_type not null,
+  title         text not null,
+  body          text,
+  listing_id    uuid references housing_listings (id) on delete cascade,
+  read_at       timestamptz,
+  created_at    timestamptz not null default now()
+);
+
+create index idx_notifications_recipient_created on notifications (recipient_id, created_at desc);
+create index idx_notifications_recipient_unread on notifications (recipient_id) where read_at is null;
+
 -- ============================================================
 -- Row Level Security (RLS) — Supabase la exige para exponer
 -- tablas vía su API REST/Realtime. El backend usa la secret key
@@ -222,6 +250,7 @@ alter table chats enable row level security;
 alter table chat_messages enable row level security;
 alter table verification_documents enable row level security;
 alter table audit_logs enable row level security;
+alter table notifications enable row level security;
 
 -- Lectura pública de publicaciones aprobadas (explorador sin login)
 create policy "listings_public_read" on housing_listings
@@ -233,6 +262,14 @@ create policy "profiles_self_read" on profiles
 
 create policy "profiles_self_update" on profiles
   for update using (auth.uid() = id);
+
+-- Un usuario puede leer y marcar como leidas sus propias notificaciones.
+-- Sin policy de insert: solo el backend (supabaseAdmin) inserta.
+create policy "notifications_self_read" on notifications
+  for select using (auth.uid() = recipient_id);
+
+create policy "notifications_self_update" on notifications
+  for update using (auth.uid() = recipient_id);
 
 -- El resto de accesos (escritura de listings, chats, admin) deben ir
 -- por el backend con la secret key, o ampliarse con policies propias

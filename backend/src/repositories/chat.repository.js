@@ -27,6 +27,11 @@ export function findChatsForUser(userId, role) {
     .order('updated_at', { ascending: false });
 }
 
+export function countChatsForUser(userId, role) {
+  const column = role === 'landlord' ? 'landlord_id' : 'student_id';
+  return supabaseAdmin.from('chats').select('*', { count: 'exact', head: true }).eq(column, userId);
+}
+
 export function findChatById(chatId) {
   return supabaseAdmin.from('chats').select('*').eq('id', chatId).single();
 }

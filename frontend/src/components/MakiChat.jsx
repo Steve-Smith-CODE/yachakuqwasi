@@ -7,7 +7,7 @@ import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jp
 
 const WELCOME_MESSAGE = {
   sender: "maki",
-  text: "¡Allillanchu, estimado estudiante! 🦅 Soy Maki, tu halcón consejero de YachakuqWasi. ¿En qué barrio de Ayacucho estás buscando alojamiento, o cuál es tu presupuesto ideal?",
+  text: "¡Allillanchu, estimado estudiante! 🦅 Soy Maki, tu halcón consejero de YachakuqWasi. ¿En qué distrito de Huamanga estás buscando alojamiento, o cuál es tu presupuesto ideal?",
   time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 };
 

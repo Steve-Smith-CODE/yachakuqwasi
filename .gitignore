@@ -8,3 +8,9 @@ coverage/
 !.env.example
 .vs/
 logs/
+
+# Fotos crudas de origen para el seed de publicaciones reales (ver
+# backend/scripts/real-listings-data.js). No se versionan: una vez
+# subidas al bucket de Supabase Storage al correr `npm run seed`, el
+# repo ya no las necesita.
+IMAGENES/

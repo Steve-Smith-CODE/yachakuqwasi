@@ -1,11 +1,9 @@
 import { Heart, MapPin, Clock, Phone } from "lucide-react";
 import { TYPE_LABEL } from "../constants/content.js";
-
-const PLACEHOLDER_IMG =
-  "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80";
+import { getPlaceholderImage } from "../constants/placeholderImages.js";
 
 export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavorite }) {
-  const image = listing.images?.[0] || PLACEHOLDER_IMG;
+  const image = listing.images?.[0] || getPlaceholderImage(listing.type, listing.id);
   const waNumber = (listing.contact_phone || "").replace(/\D/g, "");
   const waText = encodeURIComponent(
     `Hola, vengo del portal YachakuqWasi y estoy muy interesado en su alojamiento en ${listing.neighborhood} (${listing.address}). ¿Sigue disponible?`
@@ -14,7 +12,7 @@ export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavor
   return (
     <div
       onClick={() => onOpen(listing)}
-      className="w-[290px] sm:w-[340px] shrink-0 bg-white rounded-2xl border border-slate-200 hover:border-guindo shadow-sm hover:shadow-lg transition-all cursor-pointer snap-start overflow-hidden group flex flex-col justify-between"
+      className="w-[290px] sm:w-[340px] shrink-0 bg-white rounded-2xl border border-guindo/12 hover:border-guindo shadow-[0_4px_18px_-6px_rgba(88,18,18,0.12)] hover:shadow-lg transition-all cursor-pointer snap-start overflow-hidden group flex flex-col justify-between"
     >
       <div className="relative h-44 bg-slate-100 overflow-hidden">
         <img
@@ -25,7 +23,7 @@ export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavor
 
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5 z-10">
           {listing.verified_by_maki && (
-            <span className="bg-[#FFC000] text-slate-900 text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-wider font-mono shadow-sm">
+            <span className="bg-dorado-dark text-slate-900 text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-wider font-mono shadow-sm">
               Maki Verificado
             </span>
           )}
@@ -47,7 +45,7 @@ export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavor
         )}
 
         <div className="absolute bottom-2.5 left-2.5 bg-slate-900/70 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
-          <MapPin className="h-3 w-3 text-[#FFC000]" />
+          <MapPin className="h-3 w-3 text-dorado-dark" />
           <span>{listing.neighborhood}</span>
         </div>
       </div>
@@ -91,7 +89,7 @@ export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavor
             href={`tel:${listing.contact_phone}`}
             className="flex-1 bg-guindo hover:bg-guindo-dark text-white text-[11px] font-black py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer text-center"
           >
-            <Phone className="h-3 w-3 text-[#FFD700] shrink-0" />
+            <Phone className="h-3 w-3 text-dorado shrink-0" />
             <span>Llamar</span>
           </a>
           <a

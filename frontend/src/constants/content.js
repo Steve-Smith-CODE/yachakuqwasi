@@ -10,7 +10,7 @@ export const MACOT_TIPS = [
     id: "tip-2",
     title: "Cercanía a la UNSCH",
     message:
-      "Los barrios de San Blas, Av. Independencia y Belén están a pasos de la Ciudad Universitaria. Ahorrarás mucho en pasajes de mototaxi y podrás volver a casa rápido después de las clases nocturnas de tu facultad.",
+      "Los distritos de Ayacucho, San Juan Bautista y Carmen Alto están a pasos de la Ciudad Universitaria. Ahorrarás mucho en pasajes de mototaxi y podrás volver a casa rápido después de las clases nocturnas de tu facultad.",
     category: "location"
   },
   {
@@ -50,7 +50,7 @@ export const STUDENT_TESTIMONIALS = [
     studentName: "Katherin Ccoyllo",
     faculty: "Educación Inicial",
     content:
-      "Maki me dio el tip de buscar en San Blas porque el barrio es tranquilo y está lleno de fotocopiadoras y restaurantes económicos para estudiantes. ¡Recomendadísimo!",
+      "Maki me dio el tip de buscar en San Juan Bautista porque el distrito es tranquilo y está lleno de fotocopiadoras y restaurantes económicos para estudiantes. ¡Recomendadísimo!",
     rating: 5
   },
   {
@@ -58,12 +58,18 @@ export const STUDENT_TESTIMONIALS = [
     studentName: "Joel Noa",
     faculty: "Ciencias de la Salud",
     content:
-      "Estudiar enfermería exige mucho tiempo, por eso busqué con baño propio en Belén. Los consejos de Maki sobre el ruido me ayudaron a elegir un casero muy respetuoso.",
+      "Estudiar enfermería exige mucho tiempo, por eso busqué con baño propio en Jesús Nazareno. Los consejos de Maki sobre el ruido me ayudaron a elegir un casero muy respetuoso.",
     rating: 5
   }
 ];
 
-export const NEIGHBORHOODS = ["San Blas", "Av. Independencia", "Belén", "Carmen Alto", "Santa Ana"];
+export const NEIGHBORHOODS = [
+  "Ayacucho",
+  "San Juan Bautista",
+  "Carmen Alto",
+  "Jesús Nazareno",
+  "Andrés Avelino Cáceres Dorregaray"
+];
 
 export const TYPE_OPTIONS = [
   { label: "Todos", value: "" },
@@ -74,3 +80,39 @@ export const TYPE_OPTIONS = [
 ];
 
 export const TYPE_LABEL = { room: "Habitación", apartment: "Departamento", shared: "Compartido", family: "Familiar" };
+
+export const UNSCH_ACADEMIC_MAP = {
+  "Facultad de Ingeniería de Minas, Geología y Metalurgia": [
+    "Ingeniería de Sistemas",
+    "Ingeniería de Minas",
+    "Ingeniería Civil"
+  ],
+  "Facultad de Ingeniería Química y Metalurgia": [
+    "Ingeniería Química",
+    "Ingeniería en Industrias Alimentarias",
+    "Ingeniería Agroindustrial"
+  ],
+  "Facultad de Ciencias de la Salud": ["Medicina Humana", "Enfermería", "Obstetricia"],
+  "Facultad de Ciencias Biológicas": ["Biología", "Farmacia y Bioquímica"],
+  "Facultad de Ciencias Agrarias": ["Agronomía", "Ingeniería Agrícola", "Medicina Veterinaria"],
+  "Facultad de Ciencias Sociales": [
+    "Arqueología e Historia",
+    "Trabajo Social",
+    "Antropología Social",
+    "Ciencias de la Comunicación"
+  ],
+  "Facultad de Ciencias de la Educación": [
+    "Educación Inicial",
+    "Educación Primaria",
+    "Educación Secundaria",
+    "Educación Física"
+  ],
+  "Facultad de Derecho y Ciencias Políticas": ["Derecho"],
+  "Facultad de Ciencias Económicas, Administrativas y Contables": [
+    "Administración de Empresas",
+    "Contabilidad",
+    "Economía"
+  ]
+};
+
+export const FACULTIES = Object.keys(UNSCH_ACADEMIC_MAP);

@@ -4,7 +4,7 @@ import StudentDashboard from "./StudentDashboard.jsx";
 import LandlordDashboard from "./LandlordDashboard.jsx";
 
 const ROLE_INTRO = {
-  student: "Gestiona tu vida universitaria: carnet digital, roommate matching, presupuesto mensual y chats con arrendadores.",
+  student: "Gestiona tu vida universitaria: carnet digital, presupuesto mensual y chats con arrendadores.",
   landlord: "Administra tus alquileres activos, monitorea las solicitudes de estudiantes e inspecciona tus ingresos."
 };
 

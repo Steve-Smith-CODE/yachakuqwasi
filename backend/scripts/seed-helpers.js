@@ -1,4 +1,10 @@
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
+import sharp from 'sharp';
 import { supabaseAdmin } from '../src/config/supabase.js';
+import { ensureBucketExists, uploadImage } from '../src/repositories/storage.repository.js';
 
 export async function createUser({ email, password, role, name, faculty, career, phone }) {
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
@@ -33,50 +39,43 @@ export function pickRandom(array, count) {
   return shuffled.slice(0, count);
 }
 
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+// Carpeta con las fotos reales de origen (ver backend/scripts/real-listings-data.js).
+// No se versiona en git (.gitignore); solo debe existir localmente al sembrar.
+const IMAGENES_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../IMAGENES');
+const MAX_IMAGES_PER_LISTING = 8;
 
-const STREET_NAMES = [
-  'Jr. 28 de Julio', 'Jr. Asamblea', 'Jr. Lima', 'Jr. Grau', 'Jr. San Martín',
-  'Jr. Independencia', 'Jr. Bellido', 'Jr. Libertad', 'Psje. Vivanco', 'Av. Mariscal Cáceres',
-  'Av. Los Incas', 'Jr. Chorro', 'Jr. Cusco', 'Av. Universitaria'
-];
+// Sube las fotos reales de una publicacion al bucket de Supabase Storage,
+// con el mismo procesamiento (rotar por EXIF, quitar metadata, redimensionar,
+// convertir a webp) que usa la subida real desde la app (ver image.service.js).
+// Descarta fotos duplicadas exactas (mismo contenido) presentes en la carpeta origen.
+export async function uploadRealListingImages(slug, folderName) {
+  const folderPath = path.join(IMAGENES_DIR, folderName);
+  const entries = await readdir(folderPath);
+  const imageFiles = entries.filter((f) => /\.(jpe?g|png|webp)$/i.test(f)).sort();
 
-const AMENITIES_POOL = [
-  'WiFi', 'Agua caliente', 'Cocina compartida', 'Lavandería', 'Estacionamiento',
-  'Baño propio', 'Amoblado', 'Servicio de cable', 'Área de estudio', 'Seguridad 24h'
-];
+  await ensureBucketExists();
 
-const DESCRIPTION_TEMPLATES = [
-  (n) => `Habitación tranquila en ${n}, ideal para estudiantes de la UNSCH. Ambiente familiar y seguro.`,
-  (n) => `Alojamiento cómodo cerca de ${n}, a pocos minutos de la universidad. Buena iluminación natural.`,
-  (n) => `Cuarto amplio en zona de ${n}, cerca a mercados y paradero de mototaxis hacia la UNSCH.`,
-  (n) => `Espacio independiente en ${n}, perfecto para estudiantes que buscan tranquilidad para estudiar.`
-];
+  const seenHashes = new Set();
+  const urls = [];
+  for (const file of imageFiles) {
+    if (urls.length >= MAX_IMAGES_PER_LISTING) break;
 
-export function buildSyntheticListing(neighborhood, type) {
-  const street = STREET_NAMES[randomInt(0, STREET_NAMES.length - 1)];
-  const descTemplate = DESCRIPTION_TEMPLATES[randomInt(0, DESCRIPTION_TEMPLATES.length - 1)];
-  const amenities = pickRandom(AMENITIES_POOL, randomInt(2, 4));
+    const buffer = await readFile(path.join(folderPath, file));
+    const hash = crypto.createHash('sha1').update(buffer).digest('hex');
+    if (seenHashes.has(hash)) continue;
+    seenHashes.add(hash);
 
-  const priceByType = {
-    room: [200, 400],
-    shared: [150, 300],
-    apartment: [500, 900],
-    family: [350, 600]
-  };
-  const [minPrice, maxPrice] = priceByType[type] || [200, 400];
+    const processed = await sharp(buffer)
+      .rotate()
+      .withMetadata(false)
+      .resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toBuffer();
 
-  return {
-    title: `${type === 'apartment' ? 'Departamento' : 'Habitación'} en ${neighborhood}`,
-    type,
-    price_pen: randomInt(minPrice, maxPrice),
-    distance_to_unsch_minutes: randomInt(5, 25),
-    neighborhood,
-    address: `${street} ${randomInt(100, 950)}`,
-    description: descTemplate(neighborhood),
-    contact_phone: `9${randomInt(10000000, 99999999)}`,
-    amenities
-  };
+    const uploadPath = `${slug}/${urls.length}.webp`;
+    const url = await uploadImage(uploadPath, processed, 'image/webp');
+    urls.push(url);
+  }
+
+  return urls;
 }

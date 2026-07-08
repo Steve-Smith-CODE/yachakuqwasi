@@ -42,6 +42,15 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(STORAGE_KEY);
   }
 
+  function updateUser(patch) {
+    setAuth((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, user: { ...prev.user, ...patch } };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
   const value = {
     user: auth?.user ?? null,
     token: auth?.token ?? null,
@@ -49,6 +58,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    updateUser,
     authModal,
     openAuthModal,
     closeAuthModal

@@ -11,13 +11,21 @@
 //                              geocoding.service (best-effort, no toca Supabase)
 //   admin.service            -> admin.repository
 //   chat.service               -> chat.repository
-//   roommates.service            -> domain/compatibility (logica pura, sin repository)
 //   image.service                  -> storage.repository
+//   avatar.service                   -> storage.repository
+//   profile.service                    -> profile.repository, auth.repository (password), avatar.service
+//   stats.service                        -> housing.repository, favorites.repository, chat.repository
+//   notifications.service                  -> notifications.repository
+//     (housing.service y admin.service llaman a notifications.service de forma
+//      best-effort al crear/revisar publicaciones, sin que un fallo ahi tumbe la request)
 
 export * as authService from './services/auth.service.js';
 export * as housingService from './services/housing.service.js';
 export * as adminService from './services/admin.service.js';
 export * as chatService from './services/chat.service.js';
-export * as roommatesService from './services/roommates.service.js';
 export * as imageService from './services/image.service.js';
 export * as geocodingService from './services/geocoding.service.js';
+export * as avatarService from './services/avatar.service.js';
+export * as profileService from './services/profile.service.js';
+export * as statsService from './services/stats.service.js';
+export * as notificationsService from './services/notifications.service.js';

@@ -14,6 +14,7 @@ import {
   getAuditLogsRequest
 } from "../api/admin.js";
 import { ApiError } from "../api/client.js";
+import StatCard from "../components/StatCard.jsx";
 
 const TABS = [
   { id: "verifications", label: "Revisión de Identidad", icon: ShieldCheck },
@@ -21,6 +22,35 @@ const TABS = [
   { id: "users", label: "Control de Usuarios", icon: Users },
   { id: "logs", label: "Registro de Auditoría", icon: Compass }
 ];
+
+const HOUSING_STATUS_META = {
+  approved: { label: "Aprobadas", dot: "bg-emerald-500" },
+  pending: { label: "Pendientes", dot: "bg-amber-500" },
+  suspended: { label: "Suspendidas", dot: "bg-red-500" },
+  flagged: { label: "Observadas", dot: "bg-red-500" }
+};
+
+const ROLE_META = {
+  student: { label: "Estudiantes", dot: "bg-amber-500" },
+  landlord: { label: "Arrendadores", dot: "bg-sky-500" },
+  admin: { label: "Administradores", dot: "bg-rose-500" }
+};
+
+function BreakdownRow({ meta, counts }) {
+  return (
+    <div className="space-y-2">
+      {Object.entries(meta).map(([key, { label, dot }]) => (
+        <div key={key} className="flex items-center justify-between text-xs">
+          <span className="flex items-center gap-1.5 text-slate-500 font-semibold">
+            <span className={`h-2 w-2 rounded-full ${dot}`} />
+            {label}
+          </span>
+          <span className="font-black text-slate-900 font-mono">{counts[key] || 0}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const { token } = useAuth();
@@ -89,6 +119,15 @@ export default function AdminPage() {
 
   const pendingHousingsCount = allHousings.filter((h) => h.status === "pending").length;
 
+  const housingByStatus = allHousings.reduce((acc, h) => {
+    acc[h.status] = (acc[h.status] || 0) + 1;
+    return acc;
+  }, {});
+  const usersByRole = allUsers.reduce((acc, u) => {
+    acc[u.role] = (acc[u.role] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <h1 className="text-2xl font-black text-slate-900 tracking-tight">Panel de Administración</h1>
@@ -96,28 +135,41 @@ export default function AdminPage() {
 
       {stats && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-slate-900 text-white p-5 rounded-3xl border border-slate-800 text-left">
-            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Credenciales Pendientes</span>
+          <StatCard label="Credenciales Pendientes" className="bg-slate-900 border-slate-800">
             <span className="text-3xl font-black mt-1 block font-mono text-amber-400">{pendingDocs.length}</span>
-          </div>
-          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm text-left">
-            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Total Ofertas de Vivienda</span>
-            <span className="text-3xl font-black mt-1 block font-mono text-slate-800">{allHousings.length}</span>
-            <span className="text-[10px] text-emerald-600 font-bold block mt-1">
-              ✓ {allHousings.filter((l) => l.status === "approved").length} activos públicamente
-            </span>
-          </div>
-          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm text-left">
-            <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Cuentas Registradas</span>
-            <span className="text-3xl font-black mt-1 block font-mono text-slate-800">{allUsers.length}</span>
-            <span className="text-[10px] text-slate-500 block mt-1">
-              Estudiantes: {allUsers.filter((u) => u.role === "student").length} | Dueños: {allUsers.filter((u) => u.role === "landlord").length}
-            </span>
-          </div>
-          <div className="bg-[#FFFDF9] p-5 rounded-3xl border border-[#F0ECE3] text-left">
-            <span className="text-[10px] text-guindo block font-black uppercase tracking-wider">Eventos Recientes</span>
+          </StatCard>
+
+          <StatCard
+            label="Total Ofertas de Vivienda"
+            value={allHousings.length}
+            hint={`✓ ${allHousings.filter((l) => l.status === "approved").length} activos públicamente`}
+          />
+
+          <StatCard
+            label="Cuentas Registradas"
+            value={allUsers.length}
+            hint={`Estudiantes: ${allUsers.filter((u) => u.role === "student").length} | Dueños: ${allUsers.filter((u) => u.role === "landlord").length}`}
+          />
+
+          <StatCard label="Eventos Recientes" className="bg-[#FFFDF9] border-[#F0ECE3]">
             <span className="text-3xl font-black mt-1 block font-mono text-guindo">{logs.length}</span>
-          </div>
+          </StatCard>
+        </div>
+      )}
+
+      {stats && (
+        <div className="grid md:grid-cols-2 gap-4">
+          <StatCard label="Publicaciones por Estado">
+            <div className="mt-2">
+              <BreakdownRow meta={HOUSING_STATUS_META} counts={housingByStatus} />
+            </div>
+          </StatCard>
+
+          <StatCard label="Usuarios por Rol">
+            <div className="mt-2">
+              <BreakdownRow meta={ROLE_META} counts={usersByRole} />
+            </div>
+          </StatCard>
         </div>
       )}
 
@@ -136,10 +188,10 @@ export default function AdminPage() {
                 <Icon className="h-4 w-4" />
                 <span>{tab.label}</span>
                 {tab.id === "verifications" && pendingDocs.length > 0 && (
-                  <span className="bg-[#FFD700] text-slate-900 text-[9px] px-1.5 rounded-full font-black ml-1">{pendingDocs.length}</span>
+                  <span className="bg-dorado text-slate-900 text-[9px] px-1.5 rounded-full font-black ml-1">{pendingDocs.length}</span>
                 )}
                 {tab.id === "listings" && pendingHousingsCount > 0 && (
-                  <span className="bg-[#FFD700] text-slate-900 text-[9px] px-1.5 rounded-full font-black ml-1">{pendingHousingsCount}</span>
+                  <span className="bg-dorado text-slate-900 text-[9px] px-1.5 rounded-full font-black ml-1">{pendingHousingsCount}</span>
                 )}
               </button>
             );

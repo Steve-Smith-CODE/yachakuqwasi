@@ -5,10 +5,8 @@ import { X, ChevronLeft, ChevronRight, MapPin, Clock, Check, Phone, ExternalLink
 import { TYPE_LABEL } from "../constants/content.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { startChatRequest } from "../api/chat.js";
+import { getPlaceholderImages } from "../constants/placeholderImages.js";
 import makiMascot from "../assets/images/maki_hawk_guindo_plomo_1782934231251.jpg";
-
-const PLACEHOLDER_IMG =
-  "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80";
 
 export default function ListingDetailModal({ listing, onClose }) {
   const { isAuthenticated, user, token, openAuthModal } = useAuth();
@@ -16,7 +14,8 @@ export default function ListingDetailModal({ listing, onClose }) {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [startingChat, setStartingChat] = useState(false);
   const [chatError, setChatError] = useState("");
-  const images = listing?.images?.length > 0 ? listing.images : [PLACEHOLDER_IMG];
+  const images =
+    listing?.images?.length > 0 ? listing.images : getPlaceholderImages(listing?.type, listing?.id);
 
   if (!listing) return null;
 
@@ -59,7 +58,7 @@ export default function ListingDetailModal({ listing, onClose }) {
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.95, opacity: 0 }}
-          className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative z-10 border border-slate-100 overflow-y-auto max-h-[92vh]"
+          className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative z-10 border border-guindo/10 overflow-y-auto max-h-[92vh]"
         >
           <div className="relative h-48 -mx-6 -mt-6 bg-slate-100 overflow-hidden mb-4">
             <img
@@ -101,7 +100,7 @@ export default function ListingDetailModal({ listing, onClose }) {
 
             <div className="absolute top-4 left-4 flex gap-2 z-10">
               {listing.verified_by_maki && (
-                <span className="bg-[#FFC000] text-slate-900 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider font-mono shadow">
+                <span className="bg-dorado-dark text-slate-900 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider font-mono shadow">
                   Maki Verificado
                 </span>
               )}
@@ -123,12 +122,12 @@ export default function ListingDetailModal({ listing, onClose }) {
               <MapPin className="h-3.5 w-3.5" />
               <span>{listing.neighborhood} • {listing.address}</span>
             </div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight leading-snug">{listing.title}</h3>
+            <h3 className="font-display text-lg font-black text-slate-900 tracking-tight leading-snug">{listing.title}</h3>
           </div>
 
           {listing.description && <p className="text-slate-600 text-xs leading-relaxed mt-3">{listing.description}</p>}
 
-          <div className="grid grid-cols-2 gap-4 mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+          <div className="grid grid-cols-2 gap-4 mt-4 p-3 bg-slate-50 rounded-2xl border border-guindo/10">
             <div>
               <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">Cercanía a la UNSCH</span>
               <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1 mt-0.5">
@@ -173,7 +172,7 @@ export default function ListingDetailModal({ listing, onClose }) {
               href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(fullAddress)}&destination=UNSCH,+Ayacucho,+Peru&travelmode=walking`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 bg-white border border-slate-300 text-slate-700 hover:text-slate-900 py-2 px-3 rounded-xl text-[11px] font-black tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer hover:bg-slate-50"
+              className="flex-1 bg-white border border-guindo/20 text-slate-700 hover:text-slate-900 py-2 px-3 rounded-xl text-[11px] font-black tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer hover:bg-slate-50"
             >
               <ExternalLink className="h-3.5 w-3.5 text-guindo" />
               <span>Abrir Recorrido en Google Maps</span>
@@ -201,7 +200,7 @@ export default function ListingDetailModal({ listing, onClose }) {
                 {listing.amenities.map((amenity, idx) => (
                   <span
                     key={idx}
-                    className="bg-white border border-slate-200 text-slate-600 text-[10px] px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1"
+                    className="bg-white border border-guindo/12 text-slate-600 text-[10px] px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1"
                   >
                     <Check className="h-3 w-3 text-guindo" />
                     <span>{amenity}</span>
@@ -211,7 +210,7 @@ export default function ListingDetailModal({ listing, onClose }) {
             </div>
           )}
 
-          <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-3">
+          <div className="mt-5 p-4 rounded-2xl bg-slate-50 border border-guindo/10 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="text-left">
                 <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Propietario / Arrendatario</span>
@@ -224,7 +223,7 @@ export default function ListingDetailModal({ listing, onClose }) {
                 href={`tel:${listing.contact_phone}`}
                 className="bg-guindo text-white py-2.5 rounded-xl text-xs font-black hover:bg-guindo-dark transition-all shadow-md flex items-center gap-1.5 cursor-pointer justify-center"
               >
-                <Phone className="h-3.5 w-3.5 text-[#FFD700]" />
+                <Phone className="h-3.5 w-3.5 text-dorado" />
                 <span>Llamar</span>
               </a>
 

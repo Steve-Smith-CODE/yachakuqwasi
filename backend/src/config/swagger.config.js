@@ -147,22 +147,82 @@ const swaggerSpec = {
           }
         }
       },
-      LifestyleProfile: {
+      UpdateProfileRequest: {
         type: 'object',
-        required: ['fumador', 'mascotas', 'horario', 'presupuestoMax'],
         properties: {
-          fumador: { type: 'boolean' },
-          mascotas: { type: 'boolean' },
-          horario: { type: 'string', enum: ['diurno', 'nocturno'] },
-          presupuestoMax: { type: 'number', example: 500 }
+          name: { type: 'string' },
+          phone: { type: 'string' },
+          faculty: { type: 'string' },
+          career: { type: 'string' }
+        },
+        description: 'Al menos un campo es obligatorio.'
+      },
+      UpdatePasswordRequest: {
+        type: 'object',
+        required: ['password'],
+        properties: {
+          password: { type: 'string', minLength: 6, example: 'MiNuevaClave123!' }
         }
       },
-      CompatibilityRequest: {
+      UpdateAvatarRequest: {
         type: 'object',
-        required: ['profileA', 'profileB'],
+        required: ['image'],
         properties: {
-          profileA: { $ref: '#/components/schemas/LifestyleProfile' },
-          profileB: { $ref: '#/components/schemas/LifestyleProfile' }
+          image: { type: 'string', description: 'Data URL base64 (data:image/png;base64,...) o base64 plano' }
+        }
+      },
+      Profile: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          email: { type: 'string', format: 'email' },
+          name: { type: 'string' },
+          role: { type: 'string', enum: ['student', 'landlord', 'admin'] },
+          faculty: { type: 'string', nullable: true },
+          career: { type: 'string', nullable: true },
+          phone: { type: 'string', nullable: true },
+          avatar_url: { type: 'string', nullable: true },
+          is_verified: { type: 'boolean' }
+        }
+      },
+      StudentStats: {
+        type: 'object',
+        properties: {
+          savedFavorites: { type: 'integer' },
+          activeChats: { type: 'integer' }
+        }
+      },
+      LandlordStats: {
+        type: 'object',
+        properties: {
+          totalListings: { type: 'integer' },
+          listingsByStatus: { type: 'object', additionalProperties: { type: 'integer' }, example: { approved: 3, pending: 1 } },
+          favoritesReceived: { type: 'integer' },
+          contactsReceived: { type: 'integer' }
+        }
+      },
+      Notification: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          recipient_id: { type: 'string', format: 'uuid' },
+          actor_id: { type: 'string', format: 'uuid', nullable: true },
+          type: {
+            type: 'string',
+            enum: ['listing_approved', 'listing_flagged', 'listing_suspended', 'listing_pending_review']
+          },
+          title: { type: 'string' },
+          body: { type: 'string', nullable: true },
+          listing_id: { type: 'string', format: 'uuid', nullable: true },
+          read_at: { type: 'string', format: 'date-time', nullable: true },
+          created_at: { type: 'string', format: 'date-time' }
+        }
+      },
+      NotificationsResponse: {
+        type: 'object',
+        properties: {
+          notifications: { type: 'array', items: { $ref: '#/components/schemas/Notification' } },
+          unreadCount: { type: 'integer' }
         }
       },
       StartChatRequest: {
@@ -313,21 +373,118 @@ const swaggerSpec = {
         }
       }
     },
-    '/roommates/compatibilidad': {
-      post: {
-        summary: 'Calcular score de compatibilidad entre dos perfiles de estilo de vida',
-        tags: ['Roommates'],
+    '/perfil': {
+      get: {
+        summary: 'Obtener mi propio perfil',
+        tags: ['Perfil'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Perfil actual, envuelto en { profile }', content: { 'application/json': { schema: { type: 'object', properties: { profile: { $ref: '#/components/schemas/Profile' } } } } } },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      },
+      patch: {
+        summary: 'Actualizar nombre/telefono/facultad/carrera de mi propio perfil',
+        tags: ['Perfil'],
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
-          content: { 'application/json': { schema: { $ref: '#/components/schemas/CompatibilityRequest' } } }
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateProfileRequest' } } }
         },
         responses: {
-          200: {
-            description: 'Score entre 0 y 1',
-            content: { 'application/json': { schema: { type: 'object', properties: { score: { type: 'number', example: 0.8 } } } } }
-          },
+          200: { description: 'Perfil actualizado, envuelto en { profile }', content: { 'application/json': { schema: { type: 'object', properties: { profile: { $ref: '#/components/schemas/Profile' } } } } } },
           400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+    '/perfil/password': {
+      patch: {
+        summary: 'Cambiar mi propia contraseña',
+        tags: ['Perfil'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdatePasswordRequest' } } }
+        },
+        responses: {
+          200: { description: 'Contraseña actualizada' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+    '/perfil/avatar': {
+      post: {
+        summary: 'Subir/cambiar mi foto de perfil',
+        tags: ['Perfil'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateAvatarRequest' } } }
+        },
+        responses: {
+          200: { description: 'Perfil actualizado con la nueva avatar_url, envuelto en { profile }', content: { 'application/json': { schema: { type: 'object', properties: { profile: { $ref: '#/components/schemas/Profile' } } } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+    '/stats/estudiante': {
+      get: {
+        summary: 'KPIs del estudiante autenticado (favoritos, chats activos)',
+        tags: ['Stats'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Conteos del estudiante', content: { 'application/json': { schema: { $ref: '#/components/schemas/StudentStats' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
+    '/stats/arrendador': {
+      get: {
+        summary: 'KPIs del arrendador autenticado (anuncios por estado, favoritos y contactos recibidos)',
+        tags: ['Stats'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Conteos del arrendador', content: { 'application/json': { schema: { $ref: '#/components/schemas/LandlordStats' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
+    '/notificaciones': {
+      get: {
+        summary: 'Listar mis notificaciones (mas recientes primero, maximo 50) y el conteo de no leidas',
+        tags: ['Notificaciones'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Notificaciones y conteo de no leidas', content: { 'application/json': { schema: { $ref: '#/components/schemas/NotificationsResponse' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+    '/notificaciones/{id}/leer': {
+      put: {
+        summary: 'Marcar una notificacion propia como leida',
+        tags: ['Notificaciones'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Notificacion actualizada, envuelta en { notification }' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          404: { description: 'La notificacion no existe o no te pertenece' }
+        }
+      }
+    },
+    '/notificaciones/leer-todas': {
+      put: {
+        summary: 'Marcar todas mis notificaciones como leidas',
+        tags: ['Notificaciones'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: 'Notificaciones marcadas como leidas' },
           401: { $ref: '#/components/responses/Unauthorized' }
         }
       }

@@ -11,7 +11,7 @@ export const searchHousingsTool = {
   parameters: {
     type: 'OBJECT',
     properties: {
-      barrio: { type: 'STRING', description: 'Barrio de Ayacucho, ej. San Blas' },
+      barrio: { type: 'STRING', description: 'Distrito de la provincia de Huamanga, ej. San Juan Bautista' },
       tipo: { type: 'STRING', description: 'room, apartment, shared o family' },
       precio_max: { type: 'NUMBER', description: 'Precio mensual maximo en soles' }
     }
