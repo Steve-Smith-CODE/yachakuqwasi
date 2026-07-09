@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Users, Compass, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, Home, Users, Compass, CheckCircle2, ClipboardList, Heart } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   getStatsRequest,
@@ -15,13 +15,23 @@ import {
 } from "../api/admin.js";
 import { ApiError } from "../api/client.js";
 import StatCard from "../components/StatCard.jsx";
+import ListingDetailModal from "../components/ListingDetailModal.jsx";
 
 const TABS = [
   { id: "verifications", label: "Revisión de Identidad", icon: ShieldCheck },
   { id: "listings", label: "Monitoreo de Anuncios", icon: Home },
   { id: "users", label: "Control de Usuarios", icon: Users },
-  { id: "logs", label: "Registro de Auditoría", icon: Compass }
+  { id: "logs-admin", label: "Registro de Admin", icon: Compass },
+  { id: "logs-arrendadores", label: "Actividad de Arrendadores", icon: ClipboardList }
 ];
+
+const LOG_TYPE_META = {
+  system: { label: "sistema", className: "bg-slate-100 text-slate-600" },
+  user: { label: "usuario", className: "bg-sky-50 text-sky-700" },
+  listing: { label: "anuncio", className: "bg-guindo/10 text-guindo" },
+  landlord_activity: { label: "arrendador", className: "bg-amber-50 text-amber-700" },
+  favorite: { label: "favorito", className: "bg-rose-50 text-rose-600" }
+};
 
 const HOUSING_STATUS_META = {
   approved: { label: "Aprobadas", dot: "bg-emerald-500" },
@@ -35,6 +45,44 @@ const ROLE_META = {
   landlord: { label: "Arrendadores", dot: "bg-sky-500" },
   admin: { label: "Administradores", dot: "bg-rose-500" }
 };
+
+function AuditLogList({ logs, onOpenListing, emptyLabel }) {
+  if (logs.length === 0) {
+    return <p className="text-xs text-slate-400">{emptyLabel}</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {logs.map((log) => {
+        const clickable = Boolean(log.listing_id);
+        return (
+          <div
+            key={log.id}
+            onClick={() => clickable && onOpenListing(log.listing_id)}
+            className={`border border-slate-200 rounded-xl p-3 bg-white flex items-start gap-3 ${
+              clickable ? "cursor-pointer hover:border-guindo/40 hover:bg-guindo/5 transition-colors" : ""
+            }`}
+          >
+            <span
+              className={`text-[9px] font-black uppercase px-2 py-0.5 rounded shrink-0 mt-0.5 ${
+                LOG_TYPE_META[log.type]?.className || "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {LOG_TYPE_META[log.type]?.label || log.type}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-800">
+                {log.actor_name} · {log.action}
+              </p>
+              <p className="text-[11px] text-slate-500">{log.details}</p>
+              <p className="text-[9px] text-slate-400 font-mono mt-0.5">{new Date(log.created_at).toLocaleString()}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function BreakdownRow({ meta, counts }) {
   return (
@@ -60,7 +108,9 @@ export default function AdminPage() {
   const [pendingDocs, setPendingDocs] = useState([]);
   const [allHousings, setAllHousings] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
-  const [logs, setLogs] = useState([]);
+  const [adminLogs, setAdminLogs] = useState([]);
+  const [landlordLogs, setLandlordLogs] = useState([]);
+  const [viewingListing, setViewingListing] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -68,23 +118,31 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [s, docs, housings, users, auditLogs] = await Promise.all([
+      const [s, docs, housings, users, adminAuditLogs, landlordAuditLogs] = await Promise.all([
         getStatsRequest(token),
         getPendingDocumentsRequest(token),
         getAllHousingsRequest(token),
         getAllUsersRequest(token),
-        getAuditLogsRequest(token)
+        getAuditLogsRequest(token, "admin"),
+        getAuditLogsRequest(token, "arrendadores")
       ]);
       setStats(s);
       setPendingDocs(docs);
       setAllHousings(housings);
       setAllUsers(users);
-      setLogs(auditLogs);
+      setAdminLogs(adminAuditLogs);
+      setLandlordLogs(landlordAuditLogs);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar el panel de administración.");
     } finally {
       setLoading(false);
     }
+  }
+
+  function openListingFromLog(listingId) {
+    if (!listingId) return;
+    const listing = allHousings.find((h) => h.id === listingId);
+    if (listing) setViewingListing(listing);
   }
 
   useEffect(() => {
@@ -152,7 +210,7 @@ export default function AdminPage() {
           />
 
           <StatCard label="Eventos Recientes" className="bg-[#FFFDF9] border-[#F0ECE3]">
-            <span className="text-3xl font-black mt-1 block font-mono text-guindo">{logs.length}</span>
+            <span className="text-3xl font-black mt-1 block font-mono text-guindo">{adminLogs.length + landlordLogs.length}</span>
           </StatCard>
         </div>
       )}
@@ -394,37 +452,30 @@ export default function AdminPage() {
             </div>
           )}
 
-          {activeTab === "logs" && (
+          {activeTab === "logs-admin" && (
             <div className="space-y-4">
-              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Registro de Auditoría</h4>
-              {logs.length === 0 ? (
-                <p className="text-xs text-slate-400">Sin eventos registrados todavía.</p>
-              ) : (
-                <div className="space-y-2">
-                  {logs.map((log) => (
-                    <div key={log.id} className="border border-slate-200 rounded-xl p-3 bg-white flex items-start gap-3">
-                      <span
-                        className={`text-[9px] font-black uppercase px-2 py-0.5 rounded shrink-0 mt-0.5 ${
-                          log.type === "listing" ? "bg-guindo/10 text-guindo" : log.type === "system" ? "bg-slate-100 text-slate-600" : "bg-sky-50 text-sky-700"
-                        }`}
-                      >
-                        {log.type}
-                      </span>
-                      <div>
-                        <p className="text-xs font-bold text-slate-800">
-                          {log.actor_name} · {log.action}
-                        </p>
-                        <p className="text-[11px] text-slate-500">{log.details}</p>
-                        <p className="text-[9px] text-slate-400 font-mono mt-0.5">{new Date(log.created_at).toLocaleString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Registro de Admin</h4>
+              <p className="text-[11px] text-slate-400 -mt-2">Moderación de anuncios, credenciales y usuarios. Haz clic en un evento para ver el anuncio.</p>
+              <AuditLogList logs={adminLogs} onOpenListing={openListingFromLog} emptyLabel="Sin eventos registrados todavía." />
+            </div>
+          )}
+
+          {activeTab === "logs-arrendadores" && (
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span>Actividad de Arrendadores</span>
+                <Heart className="h-3.5 w-3.5 text-rose-500" />
+              </h4>
+              <p className="text-[11px] text-slate-400 -mt-2">
+                Lo que cada arrendador hace sobre sus propios anuncios (pausar, publicar, editar, eliminar) y los favoritos que marcan los estudiantes.
+              </p>
+              <AuditLogList logs={landlordLogs} onOpenListing={openListingFromLog} emptyLabel="Sin actividad de arrendadores todavía." />
             </div>
           )}
         </div>
       </div>
+
+      {viewingListing && <ListingDetailModal listing={viewingListing} onClose={() => setViewingListing(null)} />}
     </div>
   );
 }

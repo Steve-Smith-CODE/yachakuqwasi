@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { X, MapPin, Clock, Wallet, Phone, ExternalLink, Map, Compass, MessageCircle, Users, Home, Sparkles, AlignLeft } from "lucide-react";
+import { X, MapPin, Clock, Wallet, ExternalLink, Map, Compass, MessageCircle, Users, Home, Sparkles, AlignLeft } from "lucide-react";
 import { TYPE_LABEL, TYPE_ACCENT } from "../constants/content.js";
 import { getAmenityVisual } from "../constants/amenityIcons.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { startChatRequest } from "../api/chat.js";
 import { getPlaceholderImages } from "../constants/placeholderImages.js";
 import ListingGallery from "./ListingGallery.jsx";
+import PhoneContactPopover from "./PhoneContactPopover.jsx";
 import makiMascot from "../assets/images/maki-mascota.webp";
 
 const expoOut = [0.16, 1, 0.3, 1];
@@ -274,13 +275,7 @@ export default function ListingDetailModal({ listing, onClose }) {
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 mt-1">
-                    <a
-                      href={`tel:${listing.contact_phone}`}
-                      className="bg-guindo text-white py-2.5 rounded-xl text-xs font-black hover:bg-guindo-dark transition-all shadow-md flex items-center gap-1.5 cursor-pointer justify-center"
-                    >
-                      <Phone className="h-3.5 w-3.5 text-dorado" />
-                      <span>Llamar</span>
-                    </a>
+                    <PhoneContactPopover phone={listing.contact_phone} size="md" />
 
                     <a
                       href={`https://wa.me/51${waNumber}?text=${waText}`}

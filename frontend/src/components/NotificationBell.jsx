@@ -59,7 +59,10 @@ export default function NotificationBell() {
   }, []);
 
   async function handleMarkRead(id) {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: n.read_at || new Date().toISOString() } : n)));
+    const target = notifications.find((n) => n.id === id);
+    if (!target || target.read_at) return;
+
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
     try {
       await markNotificationReadRequest(token, id);

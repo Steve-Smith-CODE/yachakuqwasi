@@ -67,6 +67,13 @@ const swaggerSpec = {
           }
         }
       },
+      ForgotPasswordRequest: {
+        type: 'object',
+        required: ['email'],
+        properties: {
+          email: { type: 'string', format: 'email' }
+        }
+      },
       CreateHousingRequest: {
         type: 'object',
         required: ['title', 'pricePen', 'distanceToUnschMinutes', 'neighborhood', 'address', 'contactPhone'],
@@ -99,8 +106,122 @@ const swaggerSpec = {
           amenities: { type: 'array', items: { type: 'string' } },
           images: { type: 'array', items: { type: 'string' } },
           status: { type: 'string', enum: ['pending', 'approved', 'suspended', 'flagged'] },
+          paused_at: {
+            type: 'string',
+            format: 'date-time',
+            nullable: true,
+            description: 'Visibilidad propia del arrendador (independiente del status de moderacion). No nulo = oculto del explorador.'
+          },
+          deleted_at: { type: 'string', format: 'date-time', nullable: true, description: 'Soft delete. No nulo = eliminado por el arrendador, recuperable via /restaurar.' },
+          delete_reason: { type: 'string', enum: ['rented', 'data_changed', 'other'], nullable: true },
           created_at: { type: 'string', format: 'date-time' },
           updated_at: { type: 'string', format: 'date-time' }
+        }
+      },
+      UpdateHousingRequest: {
+        type: 'object',
+        description: 'Todos los campos son opcionales; solo se actualizan los enviados. Cambiar price_pen/address/contactPhone/neighborhood en una publicacion approved la regresa a pending.',
+        properties: {
+          title: { type: 'string' },
+          description: { type: 'string' },
+          pricePen: { type: 'number', minimum: 0 },
+          distanceToUnschMinutes: { type: 'integer', minimum: 0 },
+          neighborhood: { type: 'string' },
+          address: { type: 'string' },
+          type: { type: 'string', enum: ['room', 'apartment', 'shared', 'family'] },
+          amenities: { type: 'array', items: { type: 'string' } },
+          contactPhone: { type: 'string' }
+        }
+      },
+      SetVisibilityRequest: {
+        type: 'object',
+        required: ['paused'],
+        properties: {
+          paused: { type: 'boolean', description: 'true = pausar (ocultar del explorador), false = publicar de nuevo' }
+        }
+      },
+      DeleteHousingRequest: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string', enum: ['rented', 'data_changed', 'other'], nullable: true }
+        }
+      },
+      AuditLog: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          user_id: { type: 'string', format: 'uuid', nullable: true },
+          actor_name: { type: 'string' },
+          action: { type: 'string' },
+          details: { type: 'string', nullable: true },
+          type: { type: 'string', enum: ['system', 'user', 'listing', 'landlord_activity', 'favorite'] },
+          listing_id: { type: 'string', format: 'uuid', nullable: true },
+          created_at: { type: 'string', format: 'date-time' }
+        }
+      },
+      SetRoleRequest: {
+        type: 'object',
+        required: ['rol'],
+        properties: {
+          rol: { type: 'string', enum: ['student', 'landlord', 'admin'] }
+        }
+      },
+      AddFavoriteRequest: {
+        type: 'object',
+        required: ['listingId'],
+        properties: {
+          listingId: { type: 'string', format: 'uuid' }
+        }
+      },
+      Favorite: {
+        type: 'object',
+        properties: {
+          user_id: { type: 'string', format: 'uuid' },
+          listing_id: { type: 'string', format: 'uuid' },
+          created_at: { type: 'string', format: 'date-time' }
+        }
+      },
+      SubmitVerificationRequest: {
+        type: 'object',
+        required: ['image'],
+        properties: {
+          image: { type: 'string', description: 'Data URL base64 (data:image/jpeg;base64,...), maximo 5MB, jpeg/png/webp' }
+        }
+      },
+      VerificationDocument: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          user_id: { type: 'string', format: 'uuid' },
+          doc_url: { type: 'string', format: 'uri' },
+          status: { type: 'string', enum: ['pending', 'approved', 'rejected'] },
+          comment: { type: 'string', nullable: true },
+          created_at: { type: 'string', format: 'date-time' },
+          reviewed_at: { type: 'string', format: 'date-time', nullable: true }
+        }
+      },
+      MakiChatRequest: {
+        type: 'object',
+        required: ['message'],
+        properties: {
+          message: { type: 'string', minLength: 1, maxLength: 2000, example: '¿Qué zonas son las más cercanas a la UNSCH?' },
+          history: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                sender: { type: 'string', enum: ['user', 'maki'] },
+                text: { type: 'string' }
+              }
+            }
+          }
+        }
+      },
+      MakiChatResponse: {
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+          isSimulated: { type: 'boolean', description: 'true si ningun proveedor de IA estaba configurado y se uso una respuesta de respaldo' }
         }
       },
       Stats: {
@@ -314,6 +435,20 @@ const swaggerSpec = {
         }
       }
     },
+    '/auth/forgot-password': {
+      post: {
+        summary: 'Enviar correo de recuperacion de contraseña (Supabase Auth)',
+        tags: ['Auth'],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/ForgotPasswordRequest' } } }
+        },
+        responses: {
+          200: { description: 'Correo de recuperacion enviado (si el email existe)' },
+          400: { $ref: '#/components/responses/BadRequest' }
+        }
+      }
+    },
     '/housings': {
       get: {
         summary: 'Listar alojamientos aprobados',
@@ -370,6 +505,115 @@ const swaggerSpec = {
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' },
           404: { description: 'La publicacion no existe' }
+        }
+      }
+    },
+    '/housings/mine': {
+      get: {
+        summary: 'Listar mis propias publicaciones (arrendador/admin), incluye pausadas, excluye eliminadas',
+        tags: ['Housings'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Lista de publicaciones del arrendador autenticado',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/HousingListing' } } } }
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
+    '/housings/{id}': {
+      get: {
+        summary: 'Detalle publico de una publicacion aprobada (no pausada, no eliminada)',
+        tags: ['Housings'],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Publicacion encontrada', content: { 'application/json': { schema: { $ref: '#/components/schemas/HousingListing' } } } },
+          404: { description: 'No existe, no esta aprobada, esta pausada o fue eliminada' }
+        }
+      },
+      patch: {
+        summary: 'Editar mi propia publicacion (dueño o admin). Campos sensibles la regresan a pending.',
+        tags: ['Housings'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/UpdateHousingRequest' } } }
+        },
+        responses: {
+          200: { description: 'Publicacion actualizada', content: { 'application/json': { schema: { $ref: '#/components/schemas/HousingListing' } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'La publicacion no existe o ya fue eliminada' }
+        }
+      },
+      delete: {
+        summary: 'Eliminar (soft delete) mi propia publicacion (dueño o admin). Recuperable via /restaurar.',
+        tags: ['Housings'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: false,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/DeleteHousingRequest' } } }
+        },
+        responses: {
+          200: { description: 'Publicacion marcada como eliminada', content: { 'application/json': { schema: { $ref: '#/components/schemas/HousingListing' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'La publicacion no existe o ya fue eliminada' }
+        }
+      }
+    },
+    '/housings/{id}/visibilidad': {
+      patch: {
+        summary: 'Pausar o publicar mi propia publicacion (independiente del status de moderacion)',
+        tags: ['Housings'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/SetVisibilityRequest' } } }
+        },
+        responses: {
+          200: { description: 'Visibilidad actualizada', content: { 'application/json': { schema: { $ref: '#/components/schemas/HousingListing' } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'La publicacion no existe o ya fue eliminada' }
+        }
+      }
+    },
+    '/housings/{id}/restaurar': {
+      post: {
+        summary: 'Deshacer la eliminacion de mi propia publicacion (undo)',
+        tags: ['Housings'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Publicacion restaurada (deleted_at = null)', content: { 'application/json': { schema: { $ref: '#/components/schemas/HousingListing' } } } },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'La publicacion no existe' }
+        }
+      }
+    },
+    '/housings/{id}/historial': {
+      get: {
+        summary: 'Historial de mis propias acciones sobre este anuncio (pausar/publicar/editar/eliminar/restaurar)',
+        tags: ['Housings'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: {
+            description: 'Entradas de auditoria tipo landlord_activity para este anuncio',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/AuditLog' } } } }
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' },
+          404: { description: 'La publicacion no existe o ya fue eliminada' }
         }
       }
     },
@@ -611,6 +855,21 @@ const swaggerSpec = {
         }
       }
     },
+    '/admin/habitaciones': {
+      get: {
+        summary: 'Listar todas las publicaciones sin filtrar por estado (admin)',
+        tags: ['Admin'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Todas las publicaciones, cualquier estado',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/HousingListing' } } } }
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
     '/admin/habitaciones/{id}/estado': {
       put: {
         summary: 'Aprobar, marcar o suspender una habitacion (admin)',
@@ -644,6 +903,133 @@ const swaggerSpec = {
           400: { $ref: '#/components/responses/BadRequest' },
           401: { $ref: '#/components/responses/Unauthorized' },
           403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
+    '/admin/usuarios': {
+      get: {
+        summary: 'Listar todos los usuarios registrados (admin)',
+        tags: ['Admin'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Todos los perfiles',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/Profile' } } } }
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
+    '/admin/usuarios/{id}/rol': {
+      put: {
+        summary: 'Cambiar el rol de un usuario (admin)',
+        tags: ['Admin'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/SetRoleRequest' } } }
+        },
+        responses: {
+          200: { description: 'Usuario actualizado, envuelto en { user }' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
+    '/admin/logs': {
+      get: {
+        summary: 'Registro de auditoria, separado por audiencia',
+        tags: ['Admin'],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: 'scope',
+            in: 'query',
+            schema: { type: 'string', enum: ['admin', 'arrendadores'] },
+            description: '"admin" = moderacion/usuarios (types system,user,listing). "arrendadores" = actividad de arrendadores + favoritos de estudiantes (types landlord_activity,favorite). Sin scope: todo, sin filtrar.'
+          }
+        ],
+        responses: {
+          200: {
+            description: 'Ultimas 100 entradas, mas recientes primero',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/AuditLog' } } } }
+          },
+          401: { $ref: '#/components/responses/Unauthorized' },
+          403: { $ref: '#/components/responses/Forbidden' }
+        }
+      }
+    },
+    '/favoritos': {
+      get: {
+        summary: 'Listar mis alojamientos favoritos',
+        tags: ['Favoritos'],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: {
+            description: 'Alojamientos marcados como favoritos por el usuario autenticado',
+            content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/HousingListing' } } } }
+          },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      },
+      post: {
+        summary: 'Marcar un alojamiento como favorito',
+        tags: ['Favoritos'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/AddFavoriteRequest' } } }
+        },
+        responses: {
+          201: { description: 'Favorito creado', content: { 'application/json': { schema: { $ref: '#/components/schemas/Favorite' } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+    '/favoritos/{listingId}': {
+      delete: {
+        summary: 'Quitar un alojamiento de mis favoritos',
+        tags: ['Favoritos'],
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'listingId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          200: { description: 'Favorito eliminado' },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+    '/verificacion': {
+      post: {
+        summary: 'Subir mi documento de identidad para verificacion (estudiante o arrendador)',
+        tags: ['Verificacion'],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/SubmitVerificationRequest' } } }
+        },
+        responses: {
+          201: { description: 'Documento registrado con status = pending, envuelto en { documento }', content: { 'application/json': { schema: { type: 'object', properties: { documento: { $ref: '#/components/schemas/VerificationDocument' } } } } } },
+          400: { $ref: '#/components/responses/BadRequest' },
+          401: { $ref: '#/components/responses/Unauthorized' }
+        }
+      }
+    },
+    '/maki/chat': {
+      post: {
+        summary: 'Conversar con el asistente de IA "Maki"',
+        tags: ['Maki'],
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { $ref: '#/components/schemas/MakiChatRequest' } } }
+        },
+        responses: {
+          200: { description: 'Respuesta de Maki', content: { 'application/json': { schema: { $ref: '#/components/schemas/MakiChatResponse' } } } },
+          400: { $ref: '#/components/responses/BadRequest' }
         }
       }
     }

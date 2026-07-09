@@ -1,4 +1,15 @@
-import { createHousing, listHousings, addHousingImages, listMyHousings, getHousingById } from '../services/housing.service.js';
+import {
+  createHousing,
+  listHousings,
+  addHousingImages,
+  listMyHousings,
+  getHousingById,
+  updateHousing,
+  setHousingVisibility,
+  deleteHousing,
+  restoreDeletedHousing,
+  getHousingActivity
+} from '../services/housing.service.js';
 
 export async function create(req, res) {
   const listing = await createHousing(req.user.id, req.body);
@@ -24,4 +35,29 @@ export async function mine(req, res) {
 export async function show(req, res) {
   const listing = await getHousingById(req.params.id);
   res.json(listing);
+}
+
+export async function update(req, res) {
+  const listing = await updateHousing(req.params.id, req.user, req.body);
+  res.json(listing);
+}
+
+export async function setVisibility(req, res) {
+  const listing = await setHousingVisibility(req.params.id, req.user, req.body.paused);
+  res.json(listing);
+}
+
+export async function remove(req, res) {
+  const listing = await deleteHousing(req.params.id, req.user, req.body.reason);
+  res.json(listing);
+}
+
+export async function restore(req, res) {
+  const listing = await restoreDeletedHousing(req.params.id, req.user);
+  res.json(listing);
+}
+
+export async function activity(req, res) {
+  const logs = await getHousingActivity(req.params.id, req.user);
+  res.json(logs);
 }

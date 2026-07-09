@@ -28,6 +28,25 @@
 | `backend/` | API REST (Node.js + Express), autenticación y datos vía Supabase |
 | `frontend/` | Cliente web de la plataforma (React + Vite) |
 | `supabase/` | Esquema de base de datos y migraciones (Supabase CLI) |
+| `.specify/` | Constitución del proyecto, plantillas y scripts de Spec-Driven Development |
+| `specs/` | Especificaciones de features (una carpeta `NNN-nombre/` por feature) |
+
+---
+
+## 🧭 Metodología: Spec-Driven Development (SDD)
+
+Este proyecto usa [Spec Kit](https://github.com/github/spec-kit) para desarrollar features nuevas o cambios de lógica de negocio con especificaciones explícitas antes de escribir código. Los principios no negociables (arquitectura por capas, validación con Zod, tests como gate de merge, manejo centralizado de errores, seguridad, YAGNI) están en [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
+
+Flujo estándar para una feature no trivial (comandos disponibles como skills de Claude Code):
+
+1. `/speckit-specify` — escribe el *qué* y el *por qué* en `specs/NNN-nombre/spec.md`.
+2. `/speckit-clarify` — (opcional, recomendado) resuelve ambigüedades antes de planear.
+3. `/speckit-plan` — genera el plan de implementación; valida contra la constitución.
+4. `/speckit-tasks` — desglosa el plan en tareas ordenadas.
+5. `/speckit-analyze` — (opcional) revisa consistencia entre spec/plan/tareas.
+6. `/speckit-implement` — ejecuta las tareas manteniendo los tests en verde.
+
+Cambios pequeños (typos, config, chores no funcionales) no requieren spec completo. Todo lo que toque lógica de negocio, contratos de endpoints o el esquema de la base de datos sí.
 
 ---
 

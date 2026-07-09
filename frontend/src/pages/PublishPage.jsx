@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, ImagePlus, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { createHousingRequest, uploadHousingImagesRequest } from "../api/housings.js";
@@ -22,6 +23,7 @@ const initialForm = {
 
 export default function PublishPage() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
   const [amenityInput, setAmenityInput] = useState("");
   const [photos, setPhotos] = useState([]);
@@ -306,6 +308,14 @@ export default function PublishPage() {
               className="w-full bg-guindo text-white py-3 rounded-xl text-xs font-black hover:bg-guindo-dark transition-all shadow-md uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer mt-2 disabled:opacity-50"
             >
               <span>{loading ? (uploadingPhotos ? "Subiendo fotos..." : "Publicando...") : "Publicar Ahora"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/portal")}
+              disabled={loading}
+              className="w-full bg-transparent text-slate-500 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 hover:text-slate-700 transition-all cursor-pointer disabled:opacity-50"
+            >
+              Cancelar
             </button>
           </form>
         )}

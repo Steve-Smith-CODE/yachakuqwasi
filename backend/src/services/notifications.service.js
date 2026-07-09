@@ -72,7 +72,7 @@ export async function notifyLandlordOfHousingReview({ landlordId, listingId, lis
   ]);
 }
 
-export async function notifyAdminsOfNewHousing({ listingId, listingTitle, actorId }) {
+export async function notifyAdminsOfHousingPendingReview({ listingId, listingTitle, actorId, title }) {
   const { data: admins, error } = await findAdminIds();
   if (error || !admins?.length) return;
 
@@ -80,10 +80,14 @@ export async function notifyAdminsOfNewHousing({ listingId, listingTitle, actorI
     recipient_id: admin.id,
     actor_id: actorId ?? null,
     type: 'listing_pending_review',
-    title: 'Nueva publicación pendiente de revisión',
+    title: title || 'Nueva publicación pendiente de revisión',
     body: listingTitle,
     listing_id: listingId
   }));
 
   await insertNotifications(rows);
+}
+
+export async function notifyAdminsOfNewHousing({ listingId, listingTitle, actorId }) {
+  return notifyAdminsOfHousingPendingReview({ listingId, listingTitle, actorId });
 }

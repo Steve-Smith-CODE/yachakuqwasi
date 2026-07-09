@@ -1,6 +1,7 @@
-import { Heart, MapPin, Clock, Phone } from "lucide-react";
+import { Heart, MapPin, Clock } from "lucide-react";
 import { TYPE_LABEL, TYPE_ACCENT } from "../constants/content.js";
 import { getPlaceholderImage } from "../constants/placeholderImages.js";
+import PhoneContactPopover from "./PhoneContactPopover.jsx";
 
 export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavorite }) {
   const image = listing.images?.[0] || getPlaceholderImage(listing.type, listing.id);
@@ -86,13 +87,7 @@ export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavor
         </div>
 
         <div className="pt-3 border-t border-slate-100 flex gap-2 z-10" onClick={(e) => e.stopPropagation()}>
-          <a
-            href={`tel:${listing.contact_phone}`}
-            className="flex-1 bg-guindo hover:bg-guindo-dark text-white text-[11px] font-black py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer text-center"
-          >
-            <Phone className="h-3 w-3 text-dorado shrink-0" />
-            <span>Llamar</span>
-          </a>
+          <PhoneContactPopover phone={listing.contact_phone} size="sm" />
           <a
             href={`https://wa.me/51${waNumber}?text=${waText}`}
             target="_blank"

@@ -36,6 +36,6 @@ export function setUserRoleRequest(token, userId, rol) {
   return apiFetch(`/admin/usuarios/${userId}/rol`, { method: "PUT", token, body: { rol } });
 }
 
-export function getAuditLogsRequest(token) {
-  return apiFetch("/admin/logs", { token });
+export function getAuditLogsRequest(token, scope) {
+  return apiFetch("/admin/logs", { token, params: { scope } });
 }

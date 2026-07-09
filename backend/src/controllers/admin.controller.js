@@ -52,5 +52,5 @@ export async function setRole(req, res) {
 }
 
 export async function logs(req, res) {
-  res.json(await getAuditLogs());
+  res.json(await getAuditLogs(req.query.scope));
 }

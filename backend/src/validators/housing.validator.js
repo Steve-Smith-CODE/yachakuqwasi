@@ -19,3 +19,23 @@ export const uploadImagesSchema = z.object({
     .min(1, 'Debes enviar al menos una imagen')
     .max(8, 'Máximo 8 imágenes por publicación')
 });
+
+export const updateHousingSchema = z.object({
+  title: z.string().min(1, 'El título es obligatorio').optional(),
+  description: z.string().optional(),
+  pricePen: z.coerce.number().nonnegative('El precio no puede ser negativo').optional(),
+  distanceToUnschMinutes: z.coerce.number().int().nonnegative('La distancia no puede ser negativa').optional(),
+  neighborhood: z.string().min(1, 'El barrio es obligatorio').optional(),
+  address: z.string().min(1, 'La dirección es obligatoria').optional(),
+  type: z.enum(['room', 'apartment', 'shared', 'family']).optional(),
+  amenities: z.array(z.string()).optional(),
+  contactPhone: z.string().min(1, 'El teléfono de contacto es obligatorio').optional()
+});
+
+export const setVisibilitySchema = z.object({
+  paused: z.boolean()
+});
+
+export const deleteHousingSchema = z.object({
+  reason: z.enum(['rented', 'data_changed', 'other']).optional()
+});

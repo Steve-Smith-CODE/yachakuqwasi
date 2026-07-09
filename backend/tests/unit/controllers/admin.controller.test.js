@@ -30,7 +30,7 @@ describe('Admin Controller (Supabase local real)', () => {
   let req, res;
 
   beforeEach(() => {
-    req = { params: {}, body: {} };
+    req = { params: {}, body: {}, query: {} };
     res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
   });
 

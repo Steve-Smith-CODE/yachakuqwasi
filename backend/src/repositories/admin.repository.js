@@ -68,18 +68,19 @@ export function updateProfileRole(userId, role) {
   return supabaseAdmin.from('profiles').update({ role }).eq('id', userId).select().single();
 }
 
-export function insertAuditLog({ userId, actorName, action, details, type }) {
+export function insertAuditLog({ userId, actorName, action, details, type, listingId }) {
   return supabaseAdmin
     .from('audit_logs')
-    .insert({ user_id: userId ?? null, actor_name: actorName, action, details, type })
+    .insert({ user_id: userId ?? null, actor_name: actorName, action, details, type, listing_id: listingId ?? null })
     .select()
     .single();
 }
 
-export function findAuditLogs() {
-  return supabaseAdmin
-    .from('audit_logs')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(100);
+export function findAuditLogs({ types, listingId } = {}) {
+  let query = supabaseAdmin.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
+
+  if (types?.length) query = query.in('type', types);
+  if (listingId) query = query.eq('listing_id', listingId);
+
+  return query;
 }

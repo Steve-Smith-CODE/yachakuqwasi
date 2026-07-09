@@ -19,6 +19,8 @@ export function findApprovedHousings({ tipo, precioMax, barrio, q, page = 1, lim
     .from('housing_listings')
     .select('*, profiles!housing_listings_landlord_id_fkey(name)')
     .eq('status', 'approved')
+    .is('paused_at', null)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -49,17 +51,53 @@ export function findApprovedHousingById(id) {
     .select('*, profiles!housing_listings_landlord_id_fkey(name)')
     .eq('id', id)
     .eq('status', 'approved')
+    .is('paused_at', null)
+    .is('deleted_at', null)
     .single();
 }
 
+// El propio arrendador ve todos sus anuncios (incluidos pausados), pero no
+// los que el ya elimino (soft delete) - esos ya no le sirven en su panel.
 export function findHousingsByLandlord(landlordId) {
   return supabaseAdmin
     .from('housing_listings')
     .select('*')
     .eq('landlord_id', landlordId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
 }
 
 export function updateHousingImages(id, images) {
   return supabaseAdmin.from('housing_listings').update({ images }).eq('id', id).select().single();
+}
+
+export function updateHousingFields(id, patch) {
+  return supabaseAdmin.from('housing_listings').update(patch).eq('id', id).select().single();
+}
+
+export function setHousingPaused(id, paused) {
+  return supabaseAdmin
+    .from('housing_listings')
+    .update({ paused_at: paused ? new Date().toISOString() : null })
+    .eq('id', id)
+    .select()
+    .single();
+}
+
+export function softDeleteHousing(id, reason) {
+  return supabaseAdmin
+    .from('housing_listings')
+    .update({ deleted_at: new Date().toISOString(), delete_reason: reason || null })
+    .eq('id', id)
+    .select()
+    .single();
+}
+
+export function restoreHousing(id) {
+  return supabaseAdmin
+    .from('housing_listings')
+    .update({ deleted_at: null, delete_reason: null })
+    .eq('id', id)
+    .select()
+    .single();
 }

@@ -1,8 +1,14 @@
 import { Router } from 'express';
-import { create, list, uploadImages, mine, show } from '../controllers/housing.controller.js';
+import { create, list, uploadImages, mine, show, update, setVisibility, remove, restore, activity } from '../controllers/housing.controller.js';
 import { requireAuth, requireRole } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
-import { createHousingSchema, uploadImagesSchema } from '../validators/housing.validator.js';
+import {
+  createHousingSchema,
+  uploadImagesSchema,
+  updateHousingSchema,
+  setVisibilitySchema,
+  deleteHousingSchema
+} from '../validators/housing.validator.js';
 
 const router = Router();
 
@@ -16,5 +22,10 @@ router.get('/:id', show);
 // La verificacion de "es tu propia publicacion" vive en el service (necesita
 // leer el listing primero), no aqui como requireRole.
 router.post('/:id/imagenes', requireAuth, validate(uploadImagesSchema), uploadImages);
+router.patch('/:id/visibilidad', requireAuth, validate(setVisibilitySchema), setVisibility);
+router.patch('/:id', requireAuth, validate(updateHousingSchema), update);
+router.delete('/:id', requireAuth, validate(deleteHousingSchema), remove);
+router.post('/:id/restaurar', requireAuth, restore);
+router.get('/:id/historial', requireAuth, activity);
 
 export default router;

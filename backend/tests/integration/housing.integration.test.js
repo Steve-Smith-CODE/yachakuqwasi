@@ -134,4 +134,210 @@ describe('Housing Integration (Supabase local real)', () => {
 
     expect(res.status).toBe(404);
   });
+
+  async function insertOwnedListing(landlordId, overrides = {}) {
+    const { data, error } = await supabaseAdmin
+      .from('housing_listings')
+      .insert({
+        landlord_id: landlordId,
+        title: 'Anuncio de gestion integration',
+        price_pen: 300,
+        distance_to_unsch_minutes: 10,
+        neighborhood: 'San Blas',
+        address: 'Jr. Gestion 1',
+        contact_phone: '900000001',
+        type: 'room',
+        status: 'approved',
+        ...overrides
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    createdListingIds.push(data.id);
+    return data;
+  }
+
+  describe('PATCH /api/housings/:id (editar)', () => {
+    it('guarda un campo cosmetico al instante sin volver a pending', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const token = await loginAndGetToken(landlord);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const res = await request(app)
+        .patch(`/api/housings/${listing.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ description: 'Descripcion actualizada' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.description).toBe('Descripcion actualizada');
+      expect(res.body.status).toBe('approved');
+    });
+
+    it('vuelve a pending si se edita un campo sensible de una publicacion aprobada', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const token = await loginAndGetToken(landlord);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const res = await request(app)
+        .patch(`/api/housings/${listing.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ pricePen: 999 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.price_pen).toBe(999);
+      expect(res.body.status).toBe('pending');
+    });
+
+    it('rechaza la edicion si el usuario no es el dueño ni admin', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const other = await createRealUser({ role: 'landlord' });
+      const otherToken = await loginAndGetToken(other);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const res = await request(app)
+        .patch(`/api/housings/${listing.id}`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .send({ title: 'Intento ajeno' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('devuelve 404 si la publicacion no existe', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const token = await loginAndGetToken(landlord);
+      const fakeId = '00000000-0000-0000-0000-000000000000';
+
+      const res = await request(app)
+        .patch(`/api/housings/${fakeId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ title: 'No existe' });
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('PATCH /api/housings/:id/visibilidad (pausar/publicar)', () => {
+    it('pausa y luego publica de nuevo el anuncio del propio dueño', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const token = await loginAndGetToken(landlord);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const paused = await request(app)
+        .patch(`/api/housings/${listing.id}/visibilidad`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ paused: true });
+      expect(paused.status).toBe(200);
+      expect(paused.body.paused_at).not.toBeNull();
+
+      const published = await request(app)
+        .patch(`/api/housings/${listing.id}/visibilidad`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ paused: false });
+      expect(published.status).toBe(200);
+      expect(published.body.paused_at).toBeNull();
+    });
+
+    it('un anuncio pausado no aparece en el listado publico', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const token = await loginAndGetToken(landlord);
+      const listing = await insertOwnedListing(landlord.id, { neighborhood: 'Barrio Pausado Test' });
+
+      await request(app)
+        .patch(`/api/housings/${listing.id}/visibilidad`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ paused: true });
+
+      const res = await request(app).get('/api/housings?barrio=Barrio Pausado Test');
+      expect(res.status).toBe(200);
+      expect(res.body.map((l) => l.id)).not.toContain(listing.id);
+    });
+
+    it('rechaza cambiar visibilidad de un anuncio ajeno', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const other = await createRealUser({ role: 'landlord' });
+      const otherToken = await loginAndGetToken(other);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const res = await request(app)
+        .patch(`/api/housings/${listing.id}/visibilidad`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .send({ paused: true });
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('DELETE /api/housings/:id y POST /api/housings/:id/restaurar', () => {
+    it('elimina (soft delete) y desaparece de /mine, luego se restaura y reaparece', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const token = await loginAndGetToken(landlord);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const deleted = await request(app)
+        .delete(`/api/housings/${listing.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ reason: 'rented' });
+      expect(deleted.status).toBe(200);
+      expect(deleted.body.deleted_at).not.toBeNull();
+
+      const mineAfterDelete = await request(app).get('/api/housings/mine').set('Authorization', `Bearer ${token}`);
+      expect(mineAfterDelete.body.map((l) => l.id)).not.toContain(listing.id);
+
+      const restored = await request(app)
+        .post(`/api/housings/${listing.id}/restaurar`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(restored.status).toBe(200);
+      expect(restored.body.deleted_at).toBeNull();
+
+      const mineAfterRestore = await request(app).get('/api/housings/mine').set('Authorization', `Bearer ${token}`);
+      expect(mineAfterRestore.body.map((l) => l.id)).toContain(listing.id);
+    });
+
+    it('rechaza eliminar un anuncio ajeno', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const other = await createRealUser({ role: 'landlord' });
+      const otherToken = await loginAndGetToken(other);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const res = await request(app)
+        .delete(`/api/housings/${listing.id}`)
+        .set('Authorization', `Bearer ${otherToken}`)
+        .send({});
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  describe('GET /api/housings/:id/historial', () => {
+    it('registra y devuelve la actividad propia del arrendador sobre su anuncio', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const token = await loginAndGetToken(landlord);
+      const listing = await insertOwnedListing(landlord.id);
+
+      await request(app)
+        .patch(`/api/housings/${listing.id}/visibilidad`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ paused: true });
+
+      const res = await request(app)
+        .get(`/api/housings/${listing.id}/historial`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.some((log) => log.action === 'Pausó anuncio' && log.listing_id === listing.id)).toBe(true);
+    });
+
+    it('rechaza ver el historial de un anuncio ajeno', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const other = await createRealUser({ role: 'landlord' });
+      const otherToken = await loginAndGetToken(other);
+      const listing = await insertOwnedListing(landlord.id);
+
+      const res = await request(app)
+        .get(`/api/housings/${listing.id}/historial`)
+        .set('Authorization', `Bearer ${otherToken}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
 });

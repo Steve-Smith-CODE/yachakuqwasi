@@ -14,8 +14,14 @@ import {
   insertAuditLog,
   findAuditLogs
 } from '../repositories/admin.repository.js';
+import { findHousingById } from '../repositories/housing.repository.js';
 import { notifyLandlordOfHousingReview } from './notifications.service.js';
 import logger from '../config/logger.js';
+
+const LOG_SCOPE_TYPES = {
+  admin: ['system', 'user', 'listing'],
+  arrendadores: ['landlord_activity', 'favorite']
+};
 
 export async function getStats() {
   const [users, housings, pendingDocs] = await Promise.all([
@@ -82,6 +88,7 @@ export async function getPendingHousings() {
 }
 
 export async function updateHousingStatus(housingId, { estado }, actor) {
+  const { data: before } = await findHousingById(housingId);
   const { data, error } = await updateHousingStatusRecord(housingId, estado);
 
   if (error) {
@@ -90,26 +97,33 @@ export async function updateHousingStatus(housingId, { estado }, actor) {
     throw err;
   }
 
-  await insertAuditLog({
-    userId: actor?.id,
-    actorName: actor?.name ?? 'Admin',
-    action: `Moderar anuncio: ${estado}`,
-    details: `Anuncio '${data?.title ?? housingId}' cambiado a estado '${estado}'.`,
-    type: 'listing'
-  });
+  // Si el estado no cambio de verdad (ej. re-aprobar algo que ya estaba
+  // approved), no generamos ruido nuevo en el registro ni notificamos.
+  const statusChanged = before?.status !== estado;
 
-  try {
-    if (data) {
-      await notifyLandlordOfHousingReview({
-        landlordId: data.landlord_id,
-        listingId: data.id,
-        listingTitle: data.title,
-        estado,
-        actorId: actor?.id
-      });
+  if (statusChanged) {
+    await insertAuditLog({
+      userId: actor?.id,
+      actorName: actor?.name ?? 'Admin',
+      action: `Moderar anuncio: ${estado}`,
+      details: `Anuncio '${data?.title ?? housingId}' cambiado a estado '${estado}'.`,
+      type: 'listing',
+      listingId: data?.id ?? housingId
+    });
+
+    try {
+      if (data) {
+        await notifyLandlordOfHousingReview({
+          landlordId: data.landlord_id,
+          listingId: data.id,
+          listingTitle: data.title,
+          estado,
+          actorId: actor?.id
+        });
+      }
+    } catch (err) {
+      logger.warn(`No se pudo notificar sobre el anuncio ${housingId}: ${err.message}`);
     }
-  } catch (err) {
-    logger.warn(`No se pudo notificar sobre el anuncio ${housingId}: ${err.message}`);
   }
 
   return data;
@@ -181,8 +195,8 @@ export async function setUserRole(userId, role, actor) {
   return data;
 }
 
-export async function getAuditLogs() {
-  const { data, error } = await findAuditLogs();
+export async function getAuditLogs(scope) {
+  const { data, error } = await findAuditLogs({ types: LOG_SCOPE_TYPES[scope] });
 
   if (error) {
     const err = new Error(error.message);

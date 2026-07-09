@@ -1,20 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Home, ShieldCheck, MessageCircle, Send, Plus, Clock, Layers, Heart, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { listMyHousingsRequest } from "../api/housings.js";
+import {
+  listMyHousingsRequest,
+  setHousingVisibilityRequest,
+  deleteHousingRequest,
+  restoreHousingRequest
+} from "../api/housings.js";
 import { listChatsRequest, getMessagesRequest, sendMessageRequest } from "../api/chat.js";
 import { submitVerificationRequest } from "../api/verification.js";
 import { getLandlordStatsRequest } from "../api/stats.js";
 import { getPlaceholderImage } from "../constants/placeholderImages.js";
 import { fileToDataUrl } from "../utils/files.js";
 import StatCard from "../components/StatCard.jsx";
+import ListingActionsMenu from "../components/ListingActionsMenu.jsx";
+import EditListingModal from "../components/EditListingModal.jsx";
+import ListingHistoryPanel from "../components/ListingHistoryPanel.jsx";
 
 const STATUS_LABEL = {
   approved: { label: "Activo", className: "bg-emerald-100 text-emerald-800" },
   pending: { label: "En revisión", className: "bg-amber-100 text-amber-800" },
   suspended: { label: "Suspendido", className: "bg-red-100 text-red-800" },
   flagged: { label: "Observado", className: "bg-red-100 text-red-800" }
+};
+
+const DELETE_REASON_LABEL = {
+  rented: "Ya alquilé",
+  data_changed: "Cambié mis datos",
+  other: "Otro motivo"
 };
 
 export default function LandlordDashboard() {
@@ -30,6 +44,10 @@ export default function LandlordDashboard() {
   const [verificationStatus, setVerificationStatus] = useState(user?.verification_status || "none");
   const [uploading, setUploading] = useState(false);
   const [stats, setStats] = useState(null);
+
+  const [editingListing, setEditingListing] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
 
   useEffect(() => {
     listMyHousingsRequest(token)
@@ -76,6 +94,52 @@ export default function LandlordDashboard() {
       // no-op
     } finally {
       setUploading(false);
+    }
+  }
+
+  function showToast(message, onUndo) {
+    clearTimeout(toastTimerRef.current);
+    setToast({ message, onUndo });
+    toastTimerRef.current = setTimeout(() => setToast(null), 6000);
+  }
+
+  async function handleTogglePause(room, paused) {
+    const snapshot = listings;
+    setListings((prev) =>
+      prev.map((l) => (l.id === room.id ? { ...l, paused_at: paused ? new Date().toISOString() : null } : l))
+    );
+    try {
+      const updated = await setHousingVisibilityRequest(token, room.id, paused);
+      setListings((prev) => prev.map((l) => (l.id === room.id ? updated : l)));
+      showToast(paused ? "Anuncio pausado" : "Anuncio publicado de nuevo", async () => {
+        try {
+          const reverted = await setHousingVisibilityRequest(token, room.id, !paused);
+          setListings((prev) => prev.map((l) => (l.id === room.id ? reverted : l)));
+        } catch {
+          // no-op
+        }
+      });
+    } catch {
+      setListings(snapshot);
+    }
+  }
+
+  async function handleDeleteListing(room, reason) {
+    setListings((prev) => prev.filter((l) => l.id !== room.id));
+    try {
+      await deleteHousingRequest(token, room.id, reason);
+      const reasonLabel = DELETE_REASON_LABEL[reason];
+      showToast(`Anuncio eliminado${reasonLabel ? ` · ${reasonLabel}` : ""}`, async () => {
+        try {
+          await restoreHousingRequest(token, room.id);
+          const refreshed = await listMyHousingsRequest(token);
+          setListings(refreshed);
+        } catch {
+          // no-op
+        }
+      });
+    } catch {
+      listMyHousingsRequest(token).then(setListings).catch(() => {});
     }
   }
 
@@ -150,23 +214,38 @@ export default function LandlordDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {listings.map((room) => {
                 const status = STATUS_LABEL[room.status] || STATUS_LABEL.pending;
+                const isPaused = Boolean(room.paused_at);
                 return (
                   <div key={room.id} className="border border-slate-200 rounded-2xl p-4 space-y-3 text-left bg-slate-50/20">
                     <div className="h-28 rounded-xl overflow-hidden bg-slate-100 relative">
                       <img
                         src={room.images?.[0] || getPlaceholderImage(room.type, room.id)}
                         alt={room.title}
-                        className="w-full h-full object-cover"
+                        className={`w-full h-full object-cover ${isPaused ? "grayscale opacity-60" : ""}`}
                       />
                       <span className={`absolute top-2.5 left-2.5 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow ${status.className}`}>
                         {status.label}
                       </span>
+                      {isPaused && (
+                        <span className="absolute top-2.5 right-2.5 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow bg-slate-900/80 text-white">
+                          Pausado
+                        </span>
+                      )}
                     </div>
-                    <h5 className="text-xs font-extrabold text-slate-800 truncate">{room.title}</h5>
+                    <div className="flex items-start justify-between gap-2">
+                      <h5 className="text-xs font-extrabold text-slate-800 truncate">{room.title}</h5>
+                      <ListingActionsMenu
+                        listing={room}
+                        onEdit={() => setEditingListing(room)}
+                        onTogglePause={(paused) => handleTogglePause(room, paused)}
+                        onDelete={(reason) => handleDeleteListing(room, reason)}
+                      />
+                    </div>
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-slate-500">{room.neighborhood}</span>
                       <span className="font-black text-guindo font-mono">S/. {room.price_pen}</span>
                     </div>
+                    <ListingHistoryPanel listingId={room.id} token={token} />
                   </div>
                 );
               })}
@@ -230,6 +309,29 @@ export default function LandlordDashboard() {
           )}
         </div>
       </div>
+
+      {editingListing && (
+        <EditListingModal
+          listing={editingListing}
+          onClose={() => setEditingListing(null)}
+          onUpdated={(updated) => setListings((prev) => prev.map((l) => (l.id === updated.id ? updated : l)))}
+        />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-[11px] font-bold pl-4 pr-2 py-2.5 rounded-xl shadow-2xl flex items-center gap-3">
+          <span>{toast.message}</span>
+          <button
+            onClick={() => {
+              toast.onUndo?.();
+              setToast(null);
+            }}
+            className="text-dorado font-black uppercase tracking-wide text-[10px] px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            Deshacer
+          </button>
+        </div>
+      )}
     </div>
   );
 }
