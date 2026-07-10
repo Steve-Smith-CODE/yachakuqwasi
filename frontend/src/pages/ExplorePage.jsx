@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, useScroll, useTransform, useMotionValueEvent } from "motion/react";
 import {
@@ -14,10 +14,9 @@ import {
   Sparkles,
   Plus
 } from "lucide-react";
-import { listHousingsRequest } from "../api/housings.js";
-import { listFavoritesRequest, addFavoriteRequest, removeFavoriteRequest } from "../api/favorites.js";
-import { ApiError } from "../api/client.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useHousingSearch } from "../hooks/useHousingSearch.js";
+import { useFavorites } from "../hooks/useFavorites.js";
 import HousingCard from "../components/HousingCard.jsx";
 import { MACOT_TIPS, TIP_CATEGORY_LABEL, STUDENT_TESTIMONIALS, NEIGHBORHOODS } from "../constants/content.js";
 import unschLogoIcon from "../assets/images/maqueta-unsch.webp";
@@ -28,8 +27,6 @@ const ListingsMap = lazy(() => import("../components/ListingsMap.jsx"));
 
 const prefersReducedMotion =
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-const PAGE_SIZE = 24;
 
 function MapStepIcon() {
   return (
@@ -100,17 +97,26 @@ export default function ExplorePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState("");
-  const [barrio, setBarrio] = useState("");
-  const [tipo, setTipo] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const {
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    barrio,
+    setBarrio,
+    tipo,
+    setTipo,
+    searchQuery,
+    setSearchQuery,
+    roomSearch,
+    setRoomSearch,
+    visibleListings,
+    load,
+    loadMore,
+    resetFilters
+  } = useHousingSearch();
+  const { favoriteIds, toggleFavorite } = useFavorites(isAuthenticated, token);
 
-  const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [selectedListing, setSelectedListing] = useState(null);
   const [activeTipIndex, setActiveTipIndex] = useState(0);
 
@@ -140,95 +146,6 @@ export default function ExplorePage() {
       }, 100);
     }
   }, []);
-
-  async function load(overrideTipo = tipo) {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await listHousingsRequest({
-        barrio: barrio || undefined,
-        tipo: overrideTipo || undefined,
-        q: searchQuery.trim() || undefined,
-        page: 1,
-        limit: PAGE_SIZE
-      });
-      setListings(data);
-      setPage(1);
-      setHasMore(data.length === PAGE_SIZE);
-      return data;
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "No se pudieron cargar las habitaciones.");
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadMore() {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    try {
-      const nextPage = page + 1;
-      const data = await listHousingsRequest({
-        barrio: barrio || undefined,
-        tipo: tipo || undefined,
-        q: searchQuery.trim() || undefined,
-        page: nextPage,
-        limit: PAGE_SIZE
-      });
-      setListings((prev) => [...prev, ...data]);
-      setPage(nextPage);
-      setHasMore(data.length === PAGE_SIZE);
-    } catch {
-      // silencioso: el usuario puede volver a tocar "Cargar más"
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setFavoriteIds(new Set());
-      return;
-    }
-    listFavoritesRequest(token)
-      .then((data) => setFavoriteIds(new Set(data.map((l) => l.id))))
-      .catch(() => {});
-  }, [isAuthenticated, token]);
-
-  const filteredListings = useMemo(() => {
-    if (!searchQuery.trim()) return listings;
-    const q = searchQuery.toLowerCase();
-    return listings.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) ||
-        item.neighborhood.toLowerCase().includes(q) ||
-        (item.description || "").toLowerCase().includes(q)
-    );
-  }, [listings, searchQuery]);
-
-  // Filtro propio de la seccion "Habitaciones Disponibles": independiente del
-  // buscador del hero (searchQuery/barrio/tipo, que consulta el backend).
-  // Este solo refina al instante, en el cliente, lo que ya esta en pantalla
-  // (titulo, barrio, precio o alguna amenidad), sin tocar la API.
-  const [roomSearch, setRoomSearch] = useState("");
-
-  const visibleListings = useMemo(() => {
-    const q = roomSearch.trim().toLowerCase();
-    if (!q) return filteredListings;
-    return filteredListings.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) ||
-        item.neighborhood.toLowerCase().includes(q) ||
-        String(item.price_pen).includes(q) ||
-        (item.amenities || []).some((a) => a.toLowerCase().includes(q))
-    );
-  }, [filteredListings, roomSearch]);
 
   async function handleTypeClick(value) {
     setTipo(value);
@@ -290,22 +207,7 @@ export default function ExplorePage() {
       openAuthModal("login");
       return;
     }
-    const isFav = favoriteIds.has(listing.id);
-    try {
-      if (isFav) {
-        await removeFavoriteRequest(token, listing.id);
-        setFavoriteIds((prev) => {
-          const next = new Set(prev);
-          next.delete(listing.id);
-          return next;
-        });
-      } else {
-        await addFavoriteRequest(token, listing.id);
-        setFavoriteIds((prev) => new Set(prev).add(listing.id));
-      }
-    } catch {
-      // silencioso: el corazon simplemente no cambia si falla
-    }
+    await toggleFavorite(listing);
   }
 
   return (
@@ -592,13 +494,7 @@ export default function ExplorePage() {
                   <Compass className="h-12 w-12 text-slate-300 mx-auto stroke-1" />
                   <h4 className="font-extrabold text-slate-700">No encontramos habitaciones con esos filtros</h4>
                   <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setRoomSearch("");
-                      setBarrio("");
-                      setTipo("");
-                      load();
-                    }}
+                    onClick={() => resetFilters()}
                     className="bg-guindo text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-guindo-dark transition-all cursor-pointer"
                   >
                     Restablecer Filtros
