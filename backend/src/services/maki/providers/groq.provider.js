@@ -22,6 +22,25 @@ function toJsonSchema(value) {
   return value;
 }
 
+// Groq valida los tool calls contra el JSON Schema de forma estricta: si un
+// parametro no tiene valor, el modelo manda `null` en vez de omitir la clave,
+// y eso rompe con un 400 si el schema solo declara "type: number/string"
+// (null no es un numero/string valido). Ningun parametro de MakiTool es
+// realmente obligatorio, asi que se listan todos en "required" y se ensancha
+// su type a [tipo, "null"] — el patron documentado por OpenAI/Groq para
+// "parametros opcionales" en tool-calling estricto.
+function withNullableOptionalParams(parameters) {
+  const properties = parameters.properties;
+  if (!properties || typeof properties !== 'object') return parameters;
+
+  const widened = {};
+  for (const [name, schema] of Object.entries(properties)) {
+    widened[name] = typeof schema.type === 'string' ? { ...schema, type: [schema.type, 'null'] } : schema;
+  }
+
+  return { ...parameters, properties: widened, required: Object.keys(properties) };
+}
+
 // Adaptador Groq: misma interfaz publica que MakiService (Gemini), para que
 // el controller pueda intercambiar de proveedor sin tocar la logica de negocio.
 export class GroqMakiService {
@@ -36,7 +55,7 @@ export class GroqMakiService {
       function: {
         name: t.name,
         description: t.description,
-        parameters: toJsonSchema(t.parameters)
+        parameters: withNullableOptionalParams(toJsonSchema(t.parameters))
       }
     }));
   }

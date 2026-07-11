@@ -48,11 +48,25 @@ describe('GroqMakiService', () => {
           description: 'Herramienta de prueba',
           parameters: {
             type: 'object',
-            properties: { x: { type: 'string', description: 'una propiedad de prueba' } }
+            properties: { x: { type: ['string', 'null'], description: 'una propiedad de prueba' } },
+            required: ['x']
           }
         }
       }
     ]);
+  });
+
+  it('ensancha el type de cada parametro a [tipo, "null"] y los marca required (Groq manda null en params sin usar)', () => {
+    const service = new GroqMakiService('key');
+
+    const tools = service.buildProviderTools();
+
+    const searchHousings = tools.find((t) => t.function.name === 'search_housings');
+    const { properties, required } = searchHousings.function.parameters;
+    expect(properties.precio_max.type).toEqual(['number', 'null']);
+    expect(properties.barrio.type).toEqual(['string', 'null']);
+    expect(properties.tipo.type).toEqual(['string', 'null']);
+    expect(required).toEqual(['barrio', 'tipo', 'precio_max']);
   });
 
   it('convierte tambien los "type" dentro de arrays (p. ej. enum)', () => {
