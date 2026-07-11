@@ -93,6 +93,7 @@ describe('Chat Integration (Supabase local real)', () => {
       .post('/api/chats')
       .set('Authorization', `Bearer ${studentToken}`)
       .send({ landlordId: landlord.id, listingId: listing.id });
+    expect(startRes.status).toBe(201);
     const chatId = startRes.body.id;
     createdChatIds.push(chatId);
 

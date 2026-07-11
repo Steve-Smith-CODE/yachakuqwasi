@@ -64,13 +64,16 @@ export async function reviewDocument(docId, { estado, comentario }, actor) {
     await updateProfileVerification(doc.user_id, { verification_status: 'rejected' });
   }
 
-  await insertAuditLog({
+  const { error: auditError } = await insertAuditLog({
     userId: actor?.id,
     actorName: actor?.name ?? 'Admin',
     action: estado === 'approved' ? 'Aprobó credencial' : 'Rechazó credencial',
     details: `Documento ${docId} marcado como ${estado}.`,
     type: 'user'
   });
+  if (auditError) {
+    logger.warn(`No se pudo registrar la auditoría del documento ${docId}: ${auditError.message}`);
+  }
 
   return doc;
 }
@@ -102,14 +105,17 @@ export async function updateHousingStatus(housingId, { estado }, actor) {
   const statusChanged = before?.status !== estado;
 
   if (statusChanged) {
-    await insertAuditLog({
+    const { error: auditError } = await insertAuditLog({
       userId: actor?.id,
       actorName: actor?.name ?? 'Admin',
       action: `Moderar anuncio: ${estado}`,
       details: `Anuncio '${data?.title ?? housingId}' cambiado a estado '${estado}'.`,
       type: 'listing',
-      listingId: data?.id ?? housingId
+      listingId: data?.id ?? null
     });
+    if (auditError) {
+      logger.warn(`No se pudo registrar la auditoría del anuncio ${housingId}: ${auditError.message}`);
+    }
 
     try {
       if (data) {
@@ -140,13 +146,16 @@ export async function blockUser(userId, { motivo, dias }, actor) {
     throw err;
   }
 
-  await insertAuditLog({
+  const { error: auditError } = await insertAuditLog({
     userId: actor?.id,
     actorName: actor?.name ?? 'Admin',
     action: 'Bloqueó usuario',
     details: `Usuario ${userId} bloqueado. Motivo: ${motivo}`,
     type: 'user'
   });
+  if (auditError) {
+    logger.warn(`No se pudo registrar la auditoría del bloqueo de ${userId}: ${auditError.message}`);
+  }
 
   return { message: 'Usuario bloqueado' };
 }
@@ -184,13 +193,16 @@ export async function setUserRole(userId, role, actor) {
     throw err;
   }
 
-  await insertAuditLog({
+  const { error: auditError } = await insertAuditLog({
     userId: actor?.id,
     actorName: actor?.name ?? 'Admin',
     action: 'Cambio de rol',
     details: `Usuario ${userId} actualizado al rol '${role}'.`,
     type: 'user'
   });
+  if (auditError) {
+    logger.warn(`No se pudo registrar la auditoría del cambio de rol de ${userId}: ${auditError.message}`);
+  }
 
   return data;
 }
