@@ -16,6 +16,7 @@ import {
 } from '../repositories/admin.repository.js';
 import { findHousingById } from '../repositories/housing.repository.js';
 import { notifyLandlordOfHousingReview } from './notifications.service.js';
+import { invalidateHousingCache } from './housing.service.js';
 import logger from '../config/logger.js';
 
 const LOG_SCOPE_TYPES = {
@@ -130,6 +131,8 @@ export async function updateHousingStatus(housingId, { estado }, actor) {
     } catch (err) {
       logger.warn(`No se pudo notificar sobre el anuncio ${housingId}: ${err.message}`);
     }
+
+    invalidateHousingCache(data?.id);
   }
 
   return data;

@@ -16,6 +16,19 @@ import { notifyAdminsOfNewHousing, notifyAdminsOfHousingPendingReview } from './
 import { insertAuditLog, findAuditLogs } from '../repositories/admin.repository.js';
 import { NotFoundError, ForbiddenError, AppError } from '../errors/AppError.js';
 import logger from '../config/logger.js';
+import { withCache, cacheDeletePrefix } from '../utils/cache.js';
+
+const LIST_CACHE_PREFIX = 'housings:list:';
+const LIST_CACHE_TTL_MS = 30_000; // el explorador tolera ~30s de retraso; una moderacion/edicion invalida al toque igual
+const DETAIL_CACHE_TTL_MS = 60_000;
+
+// Las publicaciones nuevas quedan "pending" (invisibles en el explorador
+// publico) hasta que un admin las aprueba, asi que 30s de cache no oculta
+// nada que un usuario esperara ver de inmediato.
+export function invalidateHousingCache(housingId) {
+  cacheDeletePrefix(LIST_CACHE_PREFIX);
+  if (housingId) cacheDeletePrefix(`housings:detail:${housingId}`);
+}
 
 const FIELD_LABEL = {
   title: 'título',
@@ -144,25 +157,31 @@ export async function addHousingImages(housingId, user, images) {
 }
 
 export async function listHousings(filters = {}) {
-  const { data, error } = await findApprovedHousings(filters);
+  const cacheKey = LIST_CACHE_PREFIX + JSON.stringify(filters);
 
-  if (error) {
-    const err = new Error(error.message);
-    err.statusCode = 500;
-    throw err;
-  }
+  return withCache(cacheKey, LIST_CACHE_TTL_MS, async () => {
+    const { data, error } = await findApprovedHousings(filters);
 
-  return data;
+    if (error) {
+      const err = new Error(error.message);
+      err.statusCode = 500;
+      throw err;
+    }
+
+    return data;
+  });
 }
 
 export async function getHousingById(id) {
-  const { data, error } = await findApprovedHousingById(id);
+  return withCache(`housings:detail:${id}`, DETAIL_CACHE_TTL_MS, async () => {
+    const { data, error } = await findApprovedHousingById(id);
 
-  if (error || !data) {
-    throw new NotFoundError('Alojamiento');
-  }
+    if (error || !data) {
+      throw new NotFoundError('Alojamiento');
+    }
 
-  return data;
+    return data;
+  });
 }
 
 export async function listMyHousings(landlordId) {
@@ -270,6 +289,7 @@ export async function updateHousing(housingId, user, data) {
     details: `Campos actualizados: ${changedLabels.join(', ')}.${patch.status === 'pending' ? ' Vuelve a revisión.' : ''}`
   });
 
+  invalidateHousingCache(updated.id);
   return updated;
 }
 
@@ -289,6 +309,7 @@ export async function setHousingVisibility(housingId, user, paused) {
     details: updated.title
   });
 
+  invalidateHousingCache(updated.id);
   return updated;
 }
 
@@ -308,6 +329,7 @@ export async function deleteHousing(housingId, user, reason) {
     details: `${updated.title}${reason ? ` — motivo: ${DELETE_REASON_LABEL[reason] || reason}` : ''}`
   });
 
+  invalidateHousingCache(updated.id);
   return updated;
 }
 
@@ -342,6 +364,7 @@ export async function restoreDeletedHousing(housingId, user) {
     details: updated.title
   });
 
+  invalidateHousingCache(updated.id);
   return updated;
 }
 

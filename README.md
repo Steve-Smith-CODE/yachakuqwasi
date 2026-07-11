@@ -5,7 +5,7 @@
 ### Portal de alojamiento estudiantil — UNSCH, Ayacucho, Perú
 
 <p>
-<img src="https://img.shields.io/badge/version-8-blue?style=for-the-badge" alt="version" />
+<img src="https://img.shields.io/badge/version-9-blue?style=for-the-badge" alt="version" />
 <img src="https://img.shields.io/badge/status-en%20desarrollo-yellow?style=for-the-badge" alt="status" />
 <img src="https://img.shields.io/badge/tests-288%2F288%20passing-brightgreen?style=for-the-badge" alt="tests" />
 <img src="https://img.shields.io/badge/coverage-97.8%25-brightgreen?style=for-the-badge" alt="coverage" />
