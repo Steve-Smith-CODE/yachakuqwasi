@@ -5,10 +5,10 @@
 ### Portal de alojamiento estudiantil — UNSCH, Ayacucho, Perú
 
 <p>
-<img src="https://img.shields.io/badge/version-6-blue?style=for-the-badge" alt="version" />
+<img src="https://img.shields.io/badge/version-7-blue?style=for-the-badge" alt="version" />
 <img src="https://img.shields.io/badge/status-en%20desarrollo-yellow?style=for-the-badge" alt="status" />
-<img src="https://img.shields.io/badge/tests-257%2F257%20passing-brightgreen?style=for-the-badge" alt="tests" />
-<img src="https://img.shields.io/badge/coverage-99.5%25-brightgreen?style=for-the-badge" alt="coverage" />
+<img src="https://img.shields.io/badge/tests-287%2F287%20passing-brightgreen?style=for-the-badge" alt="tests" />
+<img src="https://img.shields.io/badge/coverage-97.8%25-brightgreen?style=for-the-badge" alt="coverage" />
 </p>
 
 </div>
@@ -60,7 +60,7 @@ Se revisó el backend y se reforzaron varios puntos de seguridad y calidad, expl
 - 📝 **Cada petición queda registrada con un identificador único**, para poder rastrear qué pasó si algo falla.
 - ⏱️ **Se limita cuántas peticiones puede hacer una misma persona en poco tiempo**, para evitar abusos.
 - 🧩 **Se separó el arranque del servidor de su configuración**, para poder testear la API sin levantar un puerto real.
-- 🧪 **Todo esto sin romper nada:** los 257 tests automáticos del backend siguen pasando, con ~99.5% de cobertura de código.
+- 🧪 **Todo esto sin romper nada:** los 287 tests automáticos del backend siguen pasando, con ~97.8% de cobertura de código (statements).
 
 ---
 
