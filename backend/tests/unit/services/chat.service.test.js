@@ -65,6 +65,20 @@ describe('Chat Service (Supabase local real)', () => {
     expect(landlordChats.map((c) => c.id)).toContain(chat.id);
   });
 
+  it('cada chat trae el perfil (nombre/avatar) de ambos participantes para mostrar "con quien hablo"', async () => {
+    const student = await createRealUser({ role: 'student', name: 'Estudiante Del Chat' });
+    const landlord = await createRealUser({ role: 'landlord', name: 'Arrendador Del Chat' });
+    const listing = await createListing(landlord.id);
+    const chat = await startChat(student.id, { landlordId: landlord.id, listingId: listing.id });
+    createdChatIds.push(chat.id);
+
+    const [studentChats] = [await listChatsForUser(student.id, 'student')];
+    const found = studentChats.find((c) => c.id === chat.id);
+
+    expect(found.student.name).toBe('Estudiante Del Chat');
+    expect(found.landlord.name).toBe('Arrendador Del Chat');
+  });
+
   it('envia un mensaje real y lo puede leer cualquiera de los dos participantes', async () => {
     const student = await createRealUser({ role: 'student' });
     const landlord = await createRealUser({ role: 'landlord' });

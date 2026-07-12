@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { supabaseAdmin } from '../config/supabase.js';
+import { isProfileBlocked } from '../utils/blockStatus.js';
 
 const jwks = createRemoteJWKSet(new URL(process.env.SUPABASE_JWKS_URL));
 
@@ -28,6 +29,10 @@ export async function requireAuth(req, res, next) {
 
   if (error || !profile) {
     return res.status(401).json({ error: 'Perfil de usuario no encontrado' });
+  }
+
+  if (isProfileBlocked(profile)) {
+    return res.status(403).json({ error: `Tu cuenta fue bloqueada. Motivo: ${profile.blocked_reason}` });
   }
 
   req.user = { id: payload.sub, email: payload.email, ...profile };

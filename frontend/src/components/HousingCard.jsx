@@ -2,6 +2,7 @@ import { Heart, MapPin, Clock } from "lucide-react";
 import { TYPE_LABEL, TYPE_ACCENT } from "../constants/content.js";
 import { getPlaceholderImage } from "../constants/placeholderImages.js";
 import PhoneContactPopover from "./PhoneContactPopover.jsx";
+import makiMascot from "../assets/images/maki-mascota.webp";
 
 export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavorite }) {
   const image = listing.images?.[0] || getPlaceholderImage(listing.type, listing.id);
@@ -55,6 +56,14 @@ export default function HousingCard({ listing, onOpen, isFavorite, onToggleFavor
       <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
         <div>
           <h4 className="text-sm font-extrabold text-slate-900 line-clamp-1 group-hover:text-guindo transition-colors">{listing.title}</h4>
+          <div className="flex items-center gap-1.5 mt-1">
+            <img
+              src={listing.profiles?.avatar_url || makiMascot}
+              alt={listing.profiles?.name || "Arrendador"}
+              className="h-4 w-4 rounded-full object-cover ring-1 ring-white shadow-sm shrink-0"
+            />
+            <span className="text-[10px] text-slate-400 font-semibold truncate">{listing.profiles?.name || "Arrendador"}</span>
+          </div>
           {listing.description && (
             <p className="text-slate-500 text-[11px] line-clamp-2 mt-1 leading-relaxed">{listing.description}</p>
           )}

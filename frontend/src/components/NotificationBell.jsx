@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Bell, CheckCheck, ThumbsUp, Flag, Ban, FileClock } from "lucide-react";
+import { Bell, CheckCheck, ThumbsUp, Flag, Ban, FileClock, UserPlus, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   listNotificationsRequest,
@@ -14,8 +15,34 @@ const TYPE_META = {
   listing_approved: { icon: ThumbsUp, className: "text-emerald-600 bg-emerald-100" },
   listing_flagged: { icon: Flag, className: "text-amber-600 bg-amber-100" },
   listing_suspended: { icon: Ban, className: "text-red-600 bg-red-100" },
-  listing_pending_review: { icon: FileClock, className: "text-sky-600 bg-sky-100" }
+  listing_pending_review: { icon: FileClock, className: "text-sky-600 bg-sky-100" },
+  new_user: { icon: UserPlus, className: "text-sky-600 bg-sky-100" },
+  account_blocked: { icon: ShieldAlert, className: "text-red-600 bg-red-100" },
+  account_reactivated: { icon: ShieldCheck, className: "text-emerald-600 bg-emerald-100" }
 };
+
+// A donde te manda cada tipo de notificacion al hacer click. listing_flagged/
+// suspended no pueden ir a /habitacion/:id (esa ruta solo muestra anuncios
+// approved) asi que van al portal del arrendador, donde ve todos sus anuncios
+// sin importar el estado.
+function getNotificationTarget(n) {
+  switch (n.type) {
+    case "listing_approved":
+      return n.listing_id ? { pathname: `/habitacion/${n.listing_id}` } : null;
+    case "listing_flagged":
+    case "listing_suspended":
+      return { pathname: "/portal" };
+    case "listing_pending_review":
+      return { pathname: "/admin", state: { openListingId: n.listing_id } };
+    case "new_user":
+      return n.actor_id ? { pathname: "/admin", state: { openUserId: n.actor_id } } : null;
+    case "account_blocked":
+    case "account_reactivated":
+      return { pathname: "/cuenta" };
+    default:
+      return null;
+  }
+}
 
 function timeAgo(isoDate) {
   const diffMs = Date.now() - new Date(isoDate).getTime();
@@ -29,6 +56,7 @@ function timeAgo(isoDate) {
 
 export default function NotificationBell() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [open, setOpen] = useState(false);
@@ -69,6 +97,14 @@ export default function NotificationBell() {
     } catch {
       // no-op
     }
+  }
+
+  function handleNotificationClick(n) {
+    handleMarkRead(n.id);
+    const target = getNotificationTarget(n);
+    if (!target) return;
+    setOpen(false);
+    navigate(target.pathname, target.state ? { state: target.state } : undefined);
   }
 
   async function handleMarkAllRead() {
@@ -128,7 +164,7 @@ export default function NotificationBell() {
                   return (
                     <button
                       key={n.id}
-                      onClick={() => handleMarkRead(n.id)}
+                      onClick={() => handleNotificationClick(n)}
                       className={`w-full text-left px-4 py-3 flex gap-2.5 items-start transition-colors cursor-pointer hover:bg-slate-50 ${
                         !n.read_at ? "bg-guindo/5" : ""
                       }`}

@@ -1,14 +1,17 @@
 import {
   getStats,
   getPendingDocuments,
-  reviewDocument,
+  reviewUserDocuments,
   getPendingHousings,
   updateHousingStatus,
   blockUser,
+  unblockUser,
+  deleteUserAccount,
   getAllHousingsAdmin,
   getAllUsers,
   setUserRole,
-  getAuditLogs
+  getAuditLogs,
+  getUserDetail
 } from '../services/admin.service.js';
 
 export async function stats(req, res) {
@@ -19,9 +22,9 @@ export async function pendingDocuments(req, res) {
   res.json(await getPendingDocuments());
 }
 
-export async function reviewDoc(req, res) {
-  const documento = await reviewDocument(req.params.id, req.body, req.user);
-  res.json({ documento });
+export async function reviewDocs(req, res) {
+  const documentos = await reviewUserDocuments(req.params.userId, req.body, req.user);
+  res.json({ documentos });
 }
 
 export async function pendingHousings(req, res) {
@@ -38,12 +41,26 @@ export async function block(req, res) {
   res.json(result);
 }
 
+export async function unblock(req, res) {
+  const result = await unblockUser(req.params.id, req.user);
+  res.json(result);
+}
+
+export async function deleteUser(req, res) {
+  const result = await deleteUserAccount(req.params.id, req.body, req.user);
+  res.json(result);
+}
+
 export async function allHousings(req, res) {
   res.json(await getAllHousingsAdmin());
 }
 
 export async function allUsers(req, res) {
   res.json(await getAllUsers());
+}
+
+export async function userDetail(req, res) {
+  res.json(await getUserDetail(req.params.id));
 }
 
 export async function setRole(req, res) {

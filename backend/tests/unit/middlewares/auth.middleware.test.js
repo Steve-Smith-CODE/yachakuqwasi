@@ -62,6 +62,45 @@ describe('Auth Middleware (Supabase local real)', () => {
       expect(req.user).toMatchObject({ id: user.id, email: user.email, role: 'landlord', name: 'Arrendador Middleware' });
       expect(next).toHaveBeenCalled();
     });
+
+    it('rechaza con 403 a un usuario bloqueado permanentemente (blocked_until null)', async () => {
+      const user = await createRealUser({ role: 'student' });
+      const token = await realToken(user);
+      await supabaseAdmin.from('profiles').update({ blocked_reason: 'Spam', blocked_until: null }).eq('id', user.id);
+
+      req.headers.authorization = `Bearer ${token}`;
+      await requireAuth(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Tu cuenta fue bloqueada. Motivo: Spam' });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('rechaza con 403 a un usuario con suspension temporal vigente', async () => {
+      const user = await createRealUser({ role: 'student' });
+      const token = await realToken(user);
+      const manana = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await supabaseAdmin.from('profiles').update({ blocked_reason: 'Publicaciones falsas', blocked_until: manana }).eq('id', user.id);
+
+      req.headers.authorization = `Bearer ${token}`;
+      await requireAuth(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('deja pasar si la suspension temporal ya vencio', async () => {
+      const user = await createRealUser({ role: 'student' });
+      const token = await realToken(user);
+      const ayer = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await supabaseAdmin.from('profiles').update({ blocked_reason: 'Vencida', blocked_until: ayer }).eq('id', user.id);
+
+      req.headers.authorization = `Bearer ${token}`;
+      await requireAuth(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+      expect(res.status).not.toHaveBeenCalled();
+    });
   });
 
   describe('requireRole', () => {

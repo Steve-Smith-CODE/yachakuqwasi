@@ -16,8 +16,8 @@ export function getPendingDocumentsRequest(token) {
   return apiFetch("/admin/documentos/pendientes", { token });
 }
 
-export function reviewDocumentRequest(token, id, estado, comentario) {
-  return apiFetch(`/admin/documentos/${id}`, { method: "PUT", token, body: { estado, comentario } });
+export function reviewUserDocumentsRequest(token, userId, estado, comentario) {
+  return apiFetch(`/admin/documentos/usuario/${userId}`, { method: "PUT", token, body: { estado, comentario } });
 }
 
 export function blockUserRequest(token, userId, motivo, dias) {
@@ -38,4 +38,16 @@ export function setUserRoleRequest(token, userId, rol) {
 
 export function getAuditLogsRequest(token, scope) {
   return apiFetch("/admin/logs", { token, params: { scope } });
+}
+
+export function getUserDetailRequest(token, userId) {
+  return apiFetch(`/admin/usuarios/${userId}`, { token });
+}
+
+export function reactivateUserRequest(token, userId) {
+  return apiFetch(`/admin/usuarios/${userId}/reactivar`, { method: "PUT", token });
+}
+
+export function deleteUserRequest(token, userId, motivo) {
+  return apiFetch(`/admin/usuarios/${userId}`, { method: "DELETE", token, body: { motivo } });
 }

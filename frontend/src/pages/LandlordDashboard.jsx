@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Home, ShieldCheck, MessageCircle, Send, Plus, Clock, Layers, Heart, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Home, ShieldCheck, Send, Plus, Clock, Layers, Heart, Users } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   listMyHousingsRequest,
@@ -17,6 +17,8 @@ import StatCard from "../components/StatCard.jsx";
 import ListingActionsMenu from "../components/ListingActionsMenu.jsx";
 import EditListingModal from "../components/EditListingModal.jsx";
 import ListingHistoryPanel from "../components/ListingHistoryPanel.jsx";
+import UserProfileModal from "../components/UserProfileModal.jsx";
+import makiMascot from "../assets/images/maki-mascota.webp";
 
 const STATUS_LABEL = {
   approved: { label: "Activo", className: "bg-emerald-100 text-emerald-800" },
@@ -33,8 +35,10 @@ const DELETE_REASON_LABEL = {
 
 export default function LandlordDashboard() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewingStudentId, setViewingStudentId] = useState(null);
 
   const [chats, setChats] = useState([]);
   const [activeChatId, setActiveChatId] = useState(null);
@@ -43,6 +47,8 @@ export default function LandlordDashboard() {
 
   const [verificationStatus, setVerificationStatus] = useState(user?.verification_status || "none");
   const [uploading, setUploading] = useState(false);
+  const [dniFile, setDniFile] = useState(null);
+  const [carnetFile, setCarnetFile] = useState(null);
   const [stats, setStats] = useState(null);
 
   const [editingListing, setEditingListing] = useState(null);
@@ -81,15 +87,15 @@ export default function LandlordDashboard() {
     }
   }
 
-  async function handleUploadDoc(e) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
+  async function handleSubmitVerification() {
+    if (!dniFile || !carnetFile) return;
     setUploading(true);
     try {
-      const dataUrl = await fileToDataUrl(file);
-      await submitVerificationRequest(token, dataUrl);
+      const [dniUrl, carnetUrl] = await Promise.all([fileToDataUrl(dniFile), fileToDataUrl(carnetFile)]);
+      await submitVerificationRequest(token, dniUrl, carnetUrl);
       setVerificationStatus("pending");
+      setDniFile(null);
+      setCarnetFile(null);
     } catch {
       // no-op
     } finally {
@@ -177,10 +183,46 @@ export default function LandlordDashboard() {
               <Clock className="h-4 w-4 animate-spin" /> <span>En revisión</span>
             </span>
           ) : (
-            <label className="mt-1 flex items-center gap-1.5 text-[10px] font-black text-guindo cursor-pointer underline">
-              <span>{uploading ? "Subiendo..." : "Subir DNI/Título"}</span>
-              <input type="file" accept="image/*" className="hidden" onChange={handleUploadDoc} disabled={uploading} />
-            </label>
+            <div className="mt-1 space-y-1">
+              <div className="flex gap-1">
+                <label
+                  className={`flex-1 text-center text-[9px] font-black px-1.5 py-1 rounded-lg cursor-pointer border transition-colors ${
+                    dniFile ? "border-emerald-400 text-emerald-600 bg-emerald-50" : "border-guindo/30 text-guindo hover:bg-guindo/5"
+                  }`}
+                >
+                  {dniFile ? "DNI ✓" : "DNI"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setDniFile(e.target.files?.[0] || null)}
+                    disabled={uploading}
+                  />
+                </label>
+                <label
+                  className={`flex-1 text-center text-[9px] font-black px-1.5 py-1 rounded-lg cursor-pointer border transition-colors ${
+                    carnetFile ? "border-emerald-400 text-emerald-600 bg-emerald-50" : "border-guindo/30 text-guindo hover:bg-guindo/5"
+                  }`}
+                >
+                  {carnetFile ? "Título ✓" : "Título"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setCarnetFile(e.target.files?.[0] || null)}
+                    disabled={uploading}
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                onClick={handleSubmitVerification}
+                disabled={!dniFile || !carnetFile || uploading}
+                className="w-full text-[9px] font-black text-white bg-guindo py-1 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:bg-guindo-dark transition-all"
+              >
+                {uploading ? "Enviando..." : "Enviar"}
+              </button>
+            </div>
           )}
         </StatCard>
       </div>
@@ -256,10 +298,20 @@ export default function LandlordDashboard() {
         <div className="lg:col-span-4">
           {activeChat ? (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-md flex flex-col h-[420px] overflow-hidden">
-              <div className="bg-slate-900 text-white p-3.5 shrink-0 flex items-center gap-2">
-                <MessageCircle className="h-4 w-4 text-emerald-400" />
-                <h5 className="text-[11px] font-black truncate">{activeChat.housing_listings?.title || "Chat"}</h5>
-              </div>
+              <button
+                onClick={() => activeChat.student?.id && setViewingStudentId(activeChat.student.id)}
+                className="bg-slate-900 text-white p-3.5 shrink-0 flex items-center gap-2 text-left cursor-pointer hover:bg-slate-800 transition-colors"
+              >
+                <img
+                  src={activeChat.student?.avatar_url || makiMascot}
+                  alt={activeChat.student?.name || "Estudiante"}
+                  className="h-6 w-6 rounded-full object-cover shrink-0"
+                />
+                <div className="min-w-0">
+                  <span className="text-[9px] text-slate-300 font-bold block truncate">{activeChat.student?.name || "Estudiante"}</span>
+                  <h5 className="text-[11px] font-black truncate">{activeChat.housing_listings?.title || "Chat"}</h5>
+                </div>
+              </button>
               {chats.length > 1 && (
                 <div className="flex gap-1 p-2 border-b border-slate-100 overflow-x-auto shrink-0">
                   {chats.map((c) => (
@@ -270,7 +322,7 @@ export default function LandlordDashboard() {
                         c.id === activeChatId ? "bg-guindo text-white" : "bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {c.housing_listings?.title?.slice(0, 18) || "Chat"}
+                      {c.student?.name?.split(" ")[0] || "Estudiante"}
                     </button>
                   ))}
                 </div>
@@ -331,6 +383,17 @@ export default function LandlordDashboard() {
             Deshacer
           </button>
         </div>
+      )}
+
+      {viewingStudentId && (
+        <UserProfileModal
+          userId={viewingStudentId}
+          onClose={() => setViewingStudentId(null)}
+          onOpenListing={(l) => {
+            setViewingStudentId(null);
+            navigate(`/habitacion/${l.id}`);
+          }}
+        />
       )}
     </div>
   );

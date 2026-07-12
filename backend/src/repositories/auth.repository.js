@@ -17,8 +17,21 @@ export function findProfileById(id) {
   return supabaseAdmin.from('profiles').select('*').eq('id', id).single();
 }
 
+// El email vive en auth.users (Supabase Auth), no en profiles - solo
+// consultable via la Admin API con la secret key.
+export function findAuthUserById(id) {
+  return supabaseAdmin.auth.admin.getUserById(id);
+}
+
 export function updateAuthPassword(userId, password) {
   return supabaseAdmin.auth.admin.updateUserById(userId, { password });
+}
+
+// Borra al usuario de auth.users; profiles (y por cascada housing_listings,
+// favorites, chats, notifications de ese usuario) se van con el via
+// "on delete cascade" del esquema.
+export function deleteAuthUser(userId) {
+  return supabaseAdmin.auth.admin.deleteUser(userId);
 }
 
 // Dispara el correo de "restablecer contraseña" de Supabase Auth. El enlace

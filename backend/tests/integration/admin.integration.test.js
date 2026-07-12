@@ -51,24 +51,24 @@ describe('Admin Integration (Supabase local real)', () => {
     expect(res.body.map((d) => d.id)).toContain(doc.id);
   });
 
-  it('debe aprobar un documento real y verificar identidad del usuario', async () => {
+  it('debe aprobar los documentos de un usuario real y verificar su identidad', async () => {
     const admin = await createRealUser({ role: 'admin' });
     const token = await loginAndGetToken(admin);
     const student = await createRealUser({ role: 'student' });
     const { data: doc } = await supabaseAdmin
       .from('verification_documents')
-      .insert({ user_id: student.id, doc_url: 'https://example.com/y.png', status: 'pending' })
+      .insert({ user_id: student.id, doc_url: 'https://example.com/y.png', doc_type: 'dni', status: 'pending' })
       .select()
       .single();
     createdDocIds.push(doc.id);
 
     const res = await request(app)
-      .put(`/api/admin/documentos/${doc.id}`)
+      .put(`/api/admin/documentos/usuario/${student.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ estado: 'approved', comentario: 'Valido' });
 
     expect(res.status).toBe(200);
-    expect(res.body.documento.status).toBe('approved');
+    expect(res.body.documentos[0].status).toBe('approved');
   });
 
   it('debe bloquear a un usuario real', async () => {
@@ -150,19 +150,19 @@ describe('Admin Integration (Supabase local real)', () => {
     expect(res.status).toBe(400);
   });
 
-  it('debe rechazar la revision de documento si "estado" no es approved/rejected', async () => {
+  it('debe rechazar la revision de documentos si "estado" no es approved/rejected', async () => {
     const admin = await createRealUser({ role: 'admin' });
     const token = await loginAndGetToken(admin);
     const student = await createRealUser({ role: 'student' });
     const { data: doc } = await supabaseAdmin
       .from('verification_documents')
-      .insert({ user_id: student.id, doc_url: 'https://example.com/z.png', status: 'pending' })
+      .insert({ user_id: student.id, doc_url: 'https://example.com/z.png', doc_type: 'dni', status: 'pending' })
       .select()
       .single();
     createdDocIds.push(doc.id);
 
     const res = await request(app)
-      .put(`/api/admin/documentos/${doc.id}`)
+      .put(`/api/admin/documentos/usuario/${student.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ estado: 'no-es-un-estado-valido' });
 

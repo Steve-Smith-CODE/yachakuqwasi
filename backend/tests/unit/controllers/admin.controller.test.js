@@ -1,12 +1,15 @@
 import {
   stats,
   pendingDocuments,
-  reviewDoc,
+  reviewDocs,
   pendingHousings,
   reviewHousing,
   block,
+  unblock,
+  deleteUser,
   allHousings,
   allUsers,
+  userDetail,
   setRole,
   logs
 } from '../../../src/controllers/admin.controller.js';
@@ -59,21 +62,21 @@ describe('Admin Controller (Supabase local real)', () => {
     expect(body.map((d) => d.id)).toContain(doc.id);
   });
 
-  it('reviewDoc aprueba un documento real y envuelve el resultado en { documento }', async () => {
+  it('reviewDocs aprueba los documentos reales de un usuario y envuelve el resultado en { documentos }', async () => {
     const student = await createRealUser({ role: 'student' });
     const { data: doc } = await supabaseAdmin
       .from('verification_documents')
-      .insert({ user_id: student.id, doc_url: 'https://example.com/doc2.png', status: 'pending' })
+      .insert({ user_id: student.id, doc_url: 'https://example.com/doc2.png', doc_type: 'dni', status: 'pending' })
       .select()
       .single();
     createdDocIds.push(doc.id);
 
-    req.params.id = doc.id;
+    req.params.userId = student.id;
     req.body = { estado: 'approved', comentario: 'Valido' };
-    await reviewDoc(req, res);
+    await reviewDocs(req, res);
 
     const body = res.json.mock.calls[0][0];
-    expect(body.documento.status).toBe('approved');
+    expect(body.documentos[0].status).toBe('approved');
   });
 
   it('pendingHousings responde con las habitaciones reales en estado pending', async () => {
@@ -136,6 +139,43 @@ describe('Admin Controller (Supabase local real)', () => {
     expect(res.json).toHaveBeenCalledWith({ message: 'Usuario bloqueado' });
     const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
     expect(profile.blocked_reason).toBe('Fraude');
+  });
+
+  it('unblock reactiva a un usuario real y responde con el mensaje', async () => {
+    const student = await createRealUser({ role: 'student' });
+    req.params.id = student.id;
+    req.user = { id: 'admin-id', name: 'Admin Test' };
+    await block({ params: { id: student.id }, body: { motivo: 'Temporal', dias: 2 }, query: {} }, res);
+
+    await unblock(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ message: 'Usuario reactivado' });
+    const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
+    expect(profile.blocked_reason).toBeNull();
+  });
+
+  it('deleteUser elimina la cuenta real y responde con el mensaje', async () => {
+    const student = await createRealUser({ role: 'student' });
+    req.params.id = student.id;
+    req.body = { motivo: 'Cuenta de prueba controller' };
+    req.user = { id: 'admin-id', name: 'Admin Test' };
+
+    await deleteUser(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ message: 'Cuenta eliminada' });
+    const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).maybeSingle();
+    expect(profile).toBeNull();
+  });
+
+  it('userDetail responde con el perfil, stats y actividad reales de un usuario', async () => {
+    const student = await createRealUser({ role: 'student' });
+    req.params.id = student.id;
+
+    await userDetail(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.profile.id).toBe(student.id);
+    expect(body.stats).toHaveProperty('savedFavorites');
   });
 
   it('allHousings responde con todas las publicaciones reales', async () => {

@@ -52,6 +52,11 @@ const DELETE_REASON_LABEL = {
 // publicar, editar, eliminar, restaurar). Es un registro aparte del de
 // moderacion del admin (ver admin.service.js) - ambos comparten la tabla
 // audit_logs pero se filtran por `type` para no mezclarse.
+// findOwnedHousingOrThrow deja pasar a un admin sobre publicaciones ajenas
+// (bypass de dueño), asi que esta misma funcion puede terminar registrando
+// una accion del admin, no del arrendador - en ese caso va a type 'listing'
+// (donde ya vive la moderacion) para que no aparezca mezclada como si el
+// arrendador se hubiera editado/eliminado su propio anuncio.
 async function logLandlordActivity({ user, listingId, action, details }) {
   try {
     await insertAuditLog({
@@ -59,7 +64,7 @@ async function logLandlordActivity({ user, listingId, action, details }) {
       actorName: user.name ?? 'Arrendador',
       action,
       details,
-      type: 'landlord_activity',
+      type: user.role === 'admin' ? 'listing' : 'landlord_activity',
       listingId
     });
   } catch (err) {
@@ -85,7 +90,7 @@ export async function resolveCoordinates(address, neighborhood) {
   }
 }
 
-export async function createHousing(landlordId, data) {
+export async function createHousing(landlordId, data, actor) {
   const {
     title,
     description,
@@ -129,6 +134,13 @@ export async function createHousing(landlordId, data) {
   } catch (err) {
     logger.warn(`No se pudo notificar a los admins de la publicación ${listing.id}: ${err.message}`);
   }
+
+  await logLandlordActivity({
+    user: actor ?? { id: landlordId, role: 'landlord' },
+    listingId: listing.id,
+    action: 'Creó anuncio',
+    details: listing.title
+  });
 
   return listing;
 }

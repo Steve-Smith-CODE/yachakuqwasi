@@ -2,9 +2,13 @@ import winston from 'winston';
 import path from 'path';
 import fs from 'fs';
 
+// En Vercel (y cualquier entorno serverless) el filesystem es de solo lectura
+// salvo /tmp, y los logs ya se capturan via stdout/stderr del propio hosting
+// - escribir a ./logs ahi tira EROFS y tumba la funcion en el primer request.
+const isServerless = Boolean(process.env.VERCEL);
 const logsDir = path.join(process.cwd(), 'logs');
 
-if (!fs.existsSync(logsDir)) {
+if (!isServerless && !fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
@@ -31,15 +35,19 @@ const logger = winston.createLogger({
         format
       )
     }),
-    new winston.transports.File({
-      filename: path.join(logsDir, 'error.log'),
-      level: 'error',
-      format
-    }),
-    new winston.transports.File({
-      filename: path.join(logsDir, 'combined.log'),
-      format
-    })
+    ...(isServerless
+      ? []
+      : [
+          new winston.transports.File({
+            filename: path.join(logsDir, 'error.log'),
+            level: 'error',
+            format
+          }),
+          new winston.transports.File({
+            filename: path.join(logsDir, 'combined.log'),
+            format
+          })
+        ])
   ]
 });
 

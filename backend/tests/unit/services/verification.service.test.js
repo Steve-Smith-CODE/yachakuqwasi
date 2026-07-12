@@ -16,14 +16,15 @@ afterAll(async () => {
 });
 
 describe('verification.service (Supabase Storage + DB real)', () => {
-  it('sube un documento real, lo guarda pending y marca el perfil como verification_status pending', async () => {
+  it('sube DNI + carnet reales, los guarda pending con su doc_type y marca el perfil como verification_status pending', async () => {
     const student = await createRealUser({ role: 'student' });
 
-    const documento = await submitVerificationDocument(student.id, TINY_PNG_BASE64);
-    createdDocIds.push(documento.id);
+    const documentos = await submitVerificationDocument(student.id, { dni: TINY_PNG_BASE64, carnet: TINY_PNG_BASE64 });
+    documentos.forEach((d) => createdDocIds.push(d.id));
 
-    expect(documento.user_id).toBe(student.id);
-    expect(documento.status).toBe('pending');
+    expect(documentos).toHaveLength(2);
+    expect(documentos.every((d) => d.user_id === student.id && d.status === 'pending')).toBe(true);
+    expect(documentos.map((d) => d.doc_type).sort()).toEqual(['carnet', 'dni']);
 
     const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
     expect(profile.verification_status).toBe('pending');
@@ -33,42 +34,46 @@ describe('verification.service (Supabase Storage + DB real)', () => {
     const student = await createRealUser({ role: 'student' });
     const plainBase64 = TINY_PNG_BASE64.split(',')[1];
 
-    const documento = await submitVerificationDocument(student.id, plainBase64);
-    createdDocIds.push(documento.id);
+    const documentos = await submitVerificationDocument(student.id, { dni: plainBase64, carnet: plainBase64 });
+    documentos.forEach((d) => createdDocIds.push(d.id));
 
-    expect(documento.doc_url).toMatch(/\.webp$/);
+    expect(documentos.every((d) => d.doc_url.match(/\.webp$/))).toBe(true);
   });
 
-  it('rechaza una imagen que excede el limite de 5MB', async () => {
+  it('rechaza si la foto del DNI excede el limite de 5MB', async () => {
     const student = await createRealUser({ role: 'student' });
     const bigBuffer = Buffer.alloc(5 * 1024 * 1024 + 1, 0);
     const bigImage = 'data:image/png;base64,' + bigBuffer.toString('base64');
 
-    await expect(submitVerificationDocument(student.id, bigImage)).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      submitVerificationDocument(student.id, { dni: bigImage, carnet: TINY_PNG_BASE64 })
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it('rechaza un formato valido para sharp pero no permitido (gif)', async () => {
+  it('rechaza un formato valido para sharp pero no permitido (gif) en el carnet', async () => {
     const student = await createRealUser({ role: 'student' });
     const tinyGifBase64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7';
     const gifImage = 'data:image/gif;base64,' + tinyGifBase64;
 
-    await expect(submitVerificationDocument(student.id, gifImage)).rejects.toMatchObject({ statusCode: 400 });
+    await expect(
+      submitVerificationDocument(student.id, { dni: TINY_PNG_BASE64, carnet: gifImage })
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  it('lanza error con statusCode 400 si el repositorio falla al guardar el documento', async () => {
+  it('lanza error con statusCode 400 si el repositorio falla al guardar los documentos', async () => {
     const student = await createRealUser({ role: 'student' });
-    const originalFn = verificationRepo.insertVerificationDocument;
-    verificationRepo.insertVerificationDocument = jest.fn().mockResolvedValue({
+    const originalFn = verificationRepo.insertVerificationDocuments;
+    verificationRepo.insertVerificationDocuments = jest.fn().mockResolvedValue({
       data: null,
       error: { message: 'Database connection failed' }
     });
 
     try {
-      await expect(submitVerificationDocument(student.id, TINY_PNG_BASE64)).rejects.toMatchObject({
-        statusCode: 400
-      });
+      await expect(
+        submitVerificationDocument(student.id, { dni: TINY_PNG_BASE64, carnet: TINY_PNG_BASE64 })
+      ).rejects.toMatchObject({ statusCode: 400 });
     } finally {
-      verificationRepo.insertVerificationDocument = originalFn;
+      verificationRepo.insertVerificationDocuments = originalFn;
     }
   });
 });

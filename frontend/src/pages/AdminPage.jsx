@@ -1,21 +1,27 @@
-import { useEffect, useState } from "react";
-import { ShieldCheck, Home, Users, Compass, CheckCircle2, ClipboardList, Heart } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { ShieldCheck, Home, Users, Compass, CheckCircle2, ClipboardList, Heart, ArrowUpDown } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   getStatsRequest,
   getPendingHousingsRequest,
   reviewHousingRequest,
   getPendingDocumentsRequest,
-  reviewDocumentRequest,
+  reviewUserDocumentsRequest,
   blockUserRequest,
+  reactivateUserRequest,
+  deleteUserRequest,
   getAllHousingsRequest,
   getAllUsersRequest,
   setUserRoleRequest,
   getAuditLogsRequest
 } from "../api/admin.js";
+import { deleteHousingRequest } from "../api/housings.js";
 import { ApiError } from "../api/client.js";
 import StatCard from "../components/StatCard.jsx";
 import ListingDetailModal from "../components/ListingDetailModal.jsx";
+import AdminUserDetailModal from "../components/AdminUserDetailModal.jsx";
+import makiMascot from "../assets/images/maki-mascota.webp";
 
 const TABS = [
   { id: "verifications", label: "Revisión de Identidad", icon: ShieldCheck },
@@ -84,6 +90,76 @@ function AuditLogList({ logs, onOpenListing, emptyLabel }) {
   );
 }
 
+// blocked_until null puede ser "nunca bloqueado" o "bloqueo permanente";
+// blocked_reason es el que de verdad indica que hay un bloqueo activo (y un
+// blocked_until en el pasado significa que la suspension temporal ya vencio).
+function isUserBlocked(u) {
+  return Boolean(u.blocked_reason) && (!u.blocked_until || new Date(u.blocked_until) > new Date());
+}
+
+function SortableHeader({ label, field, sort, onSort, align = "left" }) {
+  const active = sort.field === field;
+  return (
+    <th
+      onClick={() => onSort(field)}
+      className={`px-5 py-3 cursor-pointer select-none hover:text-slate-800 transition-colors ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <span className={`inline-flex items-center gap-1 ${align === "right" ? "flex-row-reverse" : ""}`}>
+        <span>{label}</span>
+        <ArrowUpDown className={`h-3 w-3 shrink-0 ${active ? "text-guindo" : "text-slate-300"}`} />
+      </span>
+    </th>
+  );
+}
+
+function makeSortToggle(setSort) {
+  return (field) => setSort((prev) => (prev.field === field ? { field, asc: !prev.asc } : { field, asc: true }));
+}
+
+function sortRows(rows, sort, getValue) {
+  if (!sort.field) return rows;
+  return [...rows].sort((a, b) => {
+    const va = getValue(a, sort.field);
+    const vb = getValue(b, sort.field);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+    return sort.asc ? cmp : -cmp;
+  });
+}
+
+function FechaHoraCelda({ iso }) {
+  if (!iso) return <span className="text-slate-300 text-[10px]">—</span>;
+  const fecha = new Date(iso);
+  return (
+    <div className="leading-tight">
+      <span className="text-[11px] text-slate-700 font-bold block">
+        {fecha.toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" })}
+      </span>
+      <span className="text-[9px] text-slate-400 block">
+        {fecha.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: true })}
+      </span>
+    </div>
+  );
+}
+
+const DOC_TYPE_LABEL = { dni: "DNI", carnet: "Carnet / Título" };
+
+// El admin ya no revisa documento por documento - agrupa DNI + carnet del
+// mismo usuario para aprobar/rechazar ambos de una sola vez (ver
+// admin.service.js:reviewUserDocuments).
+function groupDocsByUser(docs) {
+  const map = new Map();
+  for (const doc of docs) {
+    if (!map.has(doc.user_id)) {
+      map.set(doc.user_id, { userId: doc.user_id, profile: doc.profiles, docs: [] });
+    }
+    map.get(doc.user_id).docs.push(doc);
+  }
+  return Array.from(map.values());
+}
+
 function BreakdownRow({ meta, counts }) {
   return (
     <div className="space-y-2">
@@ -102,6 +178,8 @@ function BreakdownRow({ meta, counts }) {
 
 export default function AdminPage() {
   const { token } = useAuth();
+  const location = useLocation();
+  const consumedNavState = useRef(false);
   const [activeTab, setActiveTab] = useState("verifications");
 
   const [stats, setStats] = useState(null);
@@ -111,8 +189,13 @@ export default function AdminPage() {
   const [adminLogs, setAdminLogs] = useState([]);
   const [landlordLogs, setLandlordLogs] = useState([]);
   const [viewingListing, setViewingListing] = useState(null);
+  const [viewingUserId, setViewingUserId] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [listingSort, setListingSort] = useState({ field: "created_at", asc: false });
+  const [userSort, setUserSort] = useState({ field: "created_at", asc: false });
+  const sortListingsBy = makeSortToggle(setListingSort);
+  const sortUsersBy = makeSortToggle(setUserSort);
 
   async function loadAll() {
     setLoading(true);
@@ -145,14 +228,37 @@ export default function AdminPage() {
     if (listing) setViewingListing(listing);
   }
 
+  function openListingFromUserDetail(listing) {
+    setViewingUserId(null);
+    setViewingListing(listing);
+  }
+
   useEffect(() => {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleDocReview(id, estado) {
-    await reviewDocumentRequest(token, id, estado, estado === "approved" ? "Documento válido" : "Documento rechazado");
-    setPendingDocs((prev) => prev.filter((d) => d.id !== id));
+  // Llegar desde una notificacion (nuevo usuario / anuncio pendiente) debe
+  // abrir directo el modal correspondiente - una sola vez, para que acciones
+  // posteriores que recargan la data (loadAll) no lo vuelvan a abrir solas.
+  useEffect(() => {
+    if (loading || consumedNavState.current || !location.state) return;
+    consumedNavState.current = true;
+
+    if (location.state.openListingId) {
+      setActiveTab("listings");
+      const listing = allHousings.find((h) => h.id === location.state.openListingId);
+      if (listing) setViewingListing(listing);
+    }
+    if (location.state.openUserId) {
+      setActiveTab("users");
+      setViewingUserId(location.state.openUserId);
+    }
+  }, [loading, allHousings, location.state]);
+
+  async function handleDocsReview(userId, estado) {
+    await reviewUserDocumentsRequest(token, userId, estado, estado === "approved" ? "Documentos válidos" : "Documentos rechazados");
+    setPendingDocs((prev) => prev.filter((d) => d.user_id !== userId));
     loadAll();
   }
 
@@ -166,10 +272,43 @@ export default function AdminPage() {
     loadAll();
   }
 
+  async function handleSuspend(userId) {
+    const motivo = window.prompt("Motivo de la suspensión temporal:");
+    if (!motivo) return;
+    const diasInput = window.prompt("¿Por cuántos días queda suspendido?", "7");
+    const dias = Number(diasInput);
+    if (!dias || dias <= 0) return;
+    await blockUserRequest(token, userId, motivo, dias);
+    loadAll();
+  }
+
   async function handleBlock(userId) {
-    const motivo = window.prompt("Motivo del bloqueo:");
+    const motivo = window.prompt("Motivo del bloqueo permanente:");
     if (!motivo) return;
     await blockUserRequest(token, userId, motivo);
+    loadAll();
+  }
+
+  async function handleReactivate(userId) {
+    await reactivateUserRequest(token, userId);
+    loadAll();
+  }
+
+  async function handleDeleteAccount(u) {
+    const cascadeWarning =
+      u.role === "landlord" ? " Esto también elimina TODAS sus publicaciones, chats y favoritos asociados." : "";
+    const motivo = window.prompt(
+      `Vas a ELIMINAR PERMANENTEMENTE la cuenta de "${u.name}".${cascadeWarning}\n\nEscribe el motivo para confirmar:`
+    );
+    if (!motivo) return;
+    if (!window.confirm(`Última confirmación: ¿eliminar la cuenta de "${u.name}"? No se puede deshacer.`)) return;
+    await deleteUserRequest(token, u.id, motivo);
+    loadAll();
+  }
+
+  async function handleDeleteListing(item) {
+    if (!window.confirm(`¿Eliminar permanentemente el anuncio "${item.title}"? No se puede deshacer.`)) return;
+    await deleteHousingRequest(token, item.id);
     loadAll();
   }
 
@@ -185,6 +324,16 @@ export default function AdminPage() {
     acc[u.role] = (acc[u.role] || 0) + 1;
     return acc;
   }, {});
+
+  const sortedHousings = sortRows(allHousings, listingSort, (item, field) => {
+    if (field === "arrendador") return item.profiles?.name?.toLowerCase() ?? "";
+    if (field === "title") return item.title?.toLowerCase() ?? "";
+    return item[field];
+  });
+  const sortedUsers = sortRows(allUsers, userSort, (item, field) => {
+    if (field === "name") return item.name?.toLowerCase() ?? "";
+    return item[field];
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
@@ -266,53 +415,50 @@ export default function AdminPage() {
                   <h5 className="font-extrabold text-slate-700">¡Excelente! Cola de identidades limpia</h5>
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-slate-200 rounded-2xl">
-                  <table className="w-full text-xs text-left divide-y divide-slate-200">
-                    <thead className="bg-slate-50 font-bold text-slate-600">
-                      <tr>
-                        <th className="px-5 py-3">Nombre / Email</th>
-                        <th className="px-5 py-3">Rol</th>
-                        <th className="px-5 py-3">Documento</th>
-                        <th className="px-5 py-3 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                      {pendingDocs.map((doc) => (
-                        <tr key={doc.id} className="hover:bg-slate-50/50">
-                          <td className="px-5 py-4">
-                            <span className="font-extrabold text-slate-800 block">{doc.profiles?.name}</span>
-                            <span className="text-slate-400 font-mono text-[10px] block">{doc.user_id}</span>
-                          </td>
-                          <td className="px-5 py-4">
-                            <span className="text-guindo font-black uppercase text-[10px] bg-guindo/5 px-1.5 py-0.5 rounded">
-                              {doc.profiles?.role === "student" ? "Estudiante" : "Arrendador"}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4">
-                            <a href={doc.doc_url} target="_blank" rel="noreferrer" className="text-guindo underline font-mono text-[10px]">
-                              Ver documento
+                <div className="space-y-3">
+                  {groupDocsByUser(pendingDocs).map((group) => (
+                    <div
+                      key={group.userId}
+                      className="border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="font-extrabold text-slate-800 block">{group.profile?.name}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-guindo font-black uppercase text-[10px] bg-guindo/5 px-1.5 py-0.5 rounded">
+                            {group.profile?.role === "student" ? "Estudiante" : "Arrendador"}
+                          </span>
+                          <span className="text-slate-400 font-mono text-[9px]">{group.userId}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {group.docs.map((doc) => (
+                            <a
+                              key={doc.id}
+                              href={doc.doc_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-guindo underline font-mono text-[10px] bg-guindo/5 px-2 py-1 rounded-lg"
+                            >
+                              Ver {DOC_TYPE_LABEL[doc.doc_type] || doc.doc_type}
                             </a>
-                          </td>
-                          <td className="px-5 py-4 text-right">
-                            <div className="flex gap-1.5 justify-end">
-                              <button
-                                onClick={() => handleDocReview(doc.id, "approved")}
-                                className="bg-emerald-500 text-white hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
-                              >
-                                ✔ Aprobar
-                              </button>
-                              <button
-                                onClick={() => handleDocReview(doc.id, "rejected")}
-                                className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
-                              >
-                                ❌ Rechazar
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleDocsReview(group.userId, "approved")}
+                          className="bg-emerald-500 text-white hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          ✔ Aprobar ambos
+                        </button>
+                        <button
+                          onClick={() => handleDocsReview(group.userId, "rejected")}
+                          className="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                        >
+                          ❌ Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -325,15 +471,16 @@ export default function AdminPage() {
                 <table className="w-full text-xs text-left divide-y divide-slate-200">
                   <thead className="bg-slate-50 font-bold text-slate-600">
                     <tr>
-                      <th className="px-5 py-3">Inmueble</th>
-                      <th className="px-5 py-3">Ubicación</th>
-                      <th className="px-5 py-3">Arrendador</th>
-                      <th className="px-5 py-3">Estado</th>
+                      <SortableHeader label="Inmueble" field="title" sort={listingSort} onSort={sortListingsBy} />
+                      <SortableHeader label="Ubicación" field="neighborhood" sort={listingSort} onSort={sortListingsBy} />
+                      <SortableHeader label="Arrendador" field="arrendador" sort={listingSort} onSort={sortListingsBy} />
+                      <SortableHeader label="Estado" field="status" sort={listingSort} onSort={sortListingsBy} />
+                      <SortableHeader label="Creado" field="created_at" sort={listingSort} onSort={sortListingsBy} />
                       <th className="px-5 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                    {allHousings.map((item) => {
+                    {sortedHousings.map((item) => {
                       const isSuspended = item.status === "suspended" || item.status === "flagged";
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/50">
@@ -346,8 +493,17 @@ export default function AdminPage() {
                             <span className="text-slate-400 text-[10px] block">{item.address}</span>
                           </td>
                           <td className="px-5 py-4">
-                            <span className="font-bold text-slate-700 block">{item.profiles?.name || "—"}</span>
-                            <span className="text-slate-400 font-mono text-[10px] block">{item.profiles?.phone || "—"}</span>
+                            <div className="flex items-center gap-2">
+                              <img
+                                src={item.profiles?.avatar_url || makiMascot}
+                                alt={item.profiles?.name || "Arrendador"}
+                                className="h-6 w-6 rounded-full object-cover ring-1 ring-slate-100 shrink-0"
+                              />
+                              <div>
+                                <span className="font-bold text-slate-700 block">{item.profiles?.name || "—"}</span>
+                                <span className="text-slate-400 font-mono text-[10px] block">{item.profiles?.phone || "—"}</span>
+                              </div>
+                            </div>
                           </td>
                           <td className="px-5 py-4">
                             {item.status === "pending" ? (
@@ -357,6 +513,9 @@ export default function AdminPage() {
                             ) : (
                               <span className="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full font-black uppercase">Activo</span>
                             )}
+                          </td>
+                          <td className="px-5 py-4">
+                            <FechaHoraCelda iso={item.created_at} />
                           </td>
                           <td className="px-5 py-4 text-right">
                             <div className="flex gap-1.5 justify-end">
@@ -376,6 +535,12 @@ export default function AdminPage() {
                                   Suspender
                                 </button>
                               )}
+                              <button
+                                onClick={() => handleDeleteListing(item)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                              >
+                                Eliminar
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -394,14 +559,16 @@ export default function AdminPage() {
                 <table className="w-full text-xs text-left divide-y divide-slate-200">
                   <thead className="bg-slate-50 font-bold text-slate-600">
                     <tr>
-                      <th className="px-5 py-3">Nombre</th>
-                      <th className="px-5 py-3">Rol</th>
+                      <SortableHeader label="Nombre" field="name" sort={userSort} onSort={sortUsersBy} />
+                      <SortableHeader label="Rol" field="role" sort={userSort} onSort={sortUsersBy} />
                       <th className="px-5 py-3">Verificación</th>
+                      <th className="px-5 py-3">Cuenta</th>
+                      <SortableHeader label="Registrado" field="created_at" sort={userSort} onSort={sortUsersBy} />
                       <th className="px-5 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                    {allUsers.map((u) => (
+                    {sortedUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50/50">
                         <td className="px-5 py-4 font-extrabold text-slate-800">
                           <span className="block">{u.name}</span>
@@ -425,8 +592,29 @@ export default function AdminPage() {
                             <span className="text-slate-400 font-medium text-[10px]">⚪ Sin verificación</span>
                           )}
                         </td>
+                        <td className="px-5 py-4">
+                          {isUserBlocked(u) ? (
+                            <span
+                              className="bg-red-100 text-red-800 text-[9px] px-2 py-0.5 rounded-full font-black uppercase cursor-help"
+                              title={u.blocked_reason}
+                            >
+                              {u.blocked_until ? "Suspendido" : "Bloqueado"}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 font-black text-[10px]">🟢 Activo</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
+                          <FechaHoraCelda iso={u.created_at} />
+                        </td>
                         <td className="px-5 py-4 text-right">
-                          <div className="flex gap-2 justify-end items-center">
+                          <div className="flex gap-2 justify-end items-center flex-wrap">
+                            <button
+                              onClick={() => setViewingUserId(u.id)}
+                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                            >
+                              Ver
+                            </button>
                             <select
                               value={u.role}
                               onChange={(e) => handleSetRole(u.id, e.target.value)}
@@ -436,11 +624,34 @@ export default function AdminPage() {
                               <option value="landlord">Arrendador</option>
                               <option value="admin">Admin</option>
                             </select>
+                            {isUserBlocked(u) ? (
+                              <button
+                                onClick={() => handleReactivate(u.id)}
+                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                              >
+                                Reactivar
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleSuspend(u.id)}
+                                  className="bg-amber-50 hover:bg-amber-100 text-amber-700 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                                >
+                                  Suspender
+                                </button>
+                                <button
+                                  onClick={() => handleBlock(u.id)}
+                                  className="bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                                >
+                                  Bloquear
+                                </button>
+                              </>
+                            )}
                             <button
-                              onClick={() => handleBlock(u.id)}
-                              className="bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
+                              onClick={() => handleDeleteAccount(u)}
+                              className="bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer"
                             >
-                              Bloquear
+                              Eliminar cuenta
                             </button>
                           </div>
                         </td>
@@ -476,6 +687,13 @@ export default function AdminPage() {
       </div>
 
       {viewingListing && <ListingDetailModal listing={viewingListing} onClose={() => setViewingListing(null)} />}
+      {viewingUserId && (
+        <AdminUserDetailModal
+          userId={viewingUserId}
+          onClose={() => setViewingUserId(null)}
+          onOpenListing={openListingFromUserDetail}
+        />
+      )}
     </div>
   );
 }

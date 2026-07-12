@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Camera, User, Lock, ShieldCheck, Save } from "lucide-react";
+import { Camera, User, Lock, ShieldCheck, Save, GraduationCap } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
-import { updateProfileRequest, updatePasswordRequest, uploadAvatarRequest } from "../api/profile.js";
+import { updateProfileRequest, updatePasswordRequest, uploadAvatarRequest, updateInstitutionalEmailRequest } from "../api/profile.js";
 import { ApiError } from "../api/client.js";
 import { fileToDataUrl } from "../utils/files.js";
 import { UNSCH_ACADEMIC_MAP, FACULTIES } from "../constants/content.js";
@@ -28,6 +28,11 @@ export default function AccountSettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  const [institutionalEmail, setInstitutionalEmail] = useState(user.institutional_email || "");
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
 
   async function handleAvatarChange(e) {
     const file = e.target.files?.[0];
@@ -65,6 +70,22 @@ export default function AccountSettingsPage() {
       setProfileError(err instanceof ApiError ? err.message : "No se pudieron guardar los cambios.");
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  async function handleInstitutionalEmailSubmit(e) {
+    e.preventDefault();
+    setEmailError("");
+    setEmailSuccess("");
+    setSavingEmail(true);
+    try {
+      const { profile } = await updateInstitutionalEmailRequest(token, institutionalEmail);
+      updateUser(profile);
+      setEmailSuccess("Correo institucional guardado.");
+    } catch (err) {
+      setEmailError(err instanceof ApiError ? err.message : "No se pudo guardar el correo institucional.");
+    } finally {
+      setSavingEmail(false);
     }
   }
 
@@ -210,6 +231,47 @@ export default function AccountSettingsPage() {
           <Save className="h-3.5 w-3.5" />
           <span>{savingProfile ? "Guardando..." : "Guardar Cambios"}</span>
         </button>
+      </form>
+
+      <form onSubmit={handleInstitutionalEmailSubmit} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">
+        <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+          <GraduationCap className="h-4 w-4 text-guindo" />
+          <span>Correo Institucional</span>
+        </h4>
+        <p className="text-[11px] text-slate-400 -mt-2">
+          Declara tu correo institucional (.edu.pe) como una señal de confianza adicional. No reemplaza la revisión de tus documentos.
+        </p>
+
+        {emailError && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-700 text-xs font-semibold rounded-r">{emailError}</div>
+        )}
+        {emailSuccess && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 text-emerald-700 text-xs font-semibold rounded-r">{emailSuccess}</div>
+        )}
+        {user.institutional_email && !emailSuccess && (
+          <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+            <GraduationCap className="h-3 w-3" /> Declarado: {user.institutional_email}
+          </p>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="email"
+            placeholder="tunombre@unsch.edu.pe"
+            value={institutionalEmail}
+            onChange={(e) => setInstitutionalEmail(e.target.value)}
+            className="flex-1 px-3 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs bg-slate-50 font-medium"
+            required
+          />
+          <button
+            type="submit"
+            disabled={savingEmail}
+            className="bg-guindo text-white py-2.5 px-5 rounded-xl text-xs font-black hover:bg-guindo-dark transition-all shadow-md uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            <Save className="h-3.5 w-3.5" />
+            <span>{savingEmail ? "Guardando..." : "Guardar"}</span>
+          </button>
+        </div>
       </form>
 
       <form onSubmit={handlePasswordSubmit} className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-4 animate-fade-in">

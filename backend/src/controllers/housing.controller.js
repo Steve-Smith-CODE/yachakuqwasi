@@ -12,7 +12,7 @@ import {
 } from '../services/housing.service.js';
 
 export async function create(req, res) {
-  const listing = await createHousing(req.user.id, req.body);
+  const listing = await createHousing(req.user.id, req.body, req.user);
   res.status(201).json(listing);
 }
 

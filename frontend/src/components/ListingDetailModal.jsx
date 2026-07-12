@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { X, MapPin, Clock, Wallet, ExternalLink, Map, Compass, MessageCircle, Users, Home, Sparkles, AlignLeft } from "lucide-react";
+import { X, MapPin, Clock, Wallet, ExternalLink, Map, Compass, MessageCircle, Users, Sparkles, AlignLeft } from "lucide-react";
 import { TYPE_LABEL, TYPE_ACCENT } from "../constants/content.js";
 import { getAmenityVisual } from "../constants/amenityIcons.js";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -9,6 +9,7 @@ import { startChatRequest } from "../api/chat.js";
 import { getPlaceholderImages } from "../constants/placeholderImages.js";
 import ListingGallery from "./ListingGallery.jsx";
 import PhoneContactPopover from "./PhoneContactPopover.jsx";
+import UserProfileModal from "./UserProfileModal.jsx";
 import makiMascot from "../assets/images/maki-mascota.webp";
 
 const expoOut = [0.16, 1, 0.3, 1];
@@ -31,6 +32,7 @@ export default function ListingDetailModal({ listing, onClose }) {
   const { container, item } = useVariants(reduce);
   const [startingChat, setStartingChat] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [viewingHost, setViewingHost] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -92,6 +94,7 @@ export default function ListingDetailModal({ listing, onClose }) {
   );
 
   return (
+    <>
     <AnimatePresence>
       <div className="fixed inset-0 z-50 overflow-y-auto scrollbar-thin">
         <motion.div
@@ -264,15 +267,23 @@ export default function ListingDetailModal({ listing, onClose }) {
               <motion.div variants={item} className="md:sticky md:top-6 space-y-4">
                 <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-[0_4px_24px_-8px_rgba(88,18,18,0.18)] flex flex-col gap-3 relative overflow-hidden">
                   <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-guindo via-dorado to-guindo" />
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-guindo to-guindo-dark flex items-center justify-center shrink-0 shadow-sm">
-                      <Home className="h-5 w-5 text-dorado" />
+                  <button
+                    onClick={() => listing.landlord_id && setViewingHost(true)}
+                    disabled={!listing.landlord_id}
+                    className="flex items-center gap-2.5 text-left disabled:cursor-default enabled:cursor-pointer enabled:hover:opacity-80 transition-opacity"
+                  >
+                    <div className="h-10 w-10 rounded-full overflow-hidden shrink-0 shadow-sm ring-1 ring-slate-100">
+                      <img
+                        src={listing.profiles?.avatar_url || makiMascot}
+                        alt={listing.profiles?.name || "Arrendador"}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="text-left">
                       <span className="text-[9px] text-slate-400 block font-bold uppercase tracking-wider">Anfitrión</span>
                       <span className="text-sm font-extrabold text-slate-800 block">{listing.profiles?.name || "Arrendador"}</span>
                     </div>
-                  </div>
+                  </button>
 
                   <div className="grid grid-cols-2 gap-2 mt-1">
                     <PhoneContactPopover phone={listing.contact_phone} size="md" />
@@ -309,5 +320,16 @@ export default function ListingDetailModal({ listing, onClose }) {
         </div>
       </div>
     </AnimatePresence>
+    {viewingHost && (
+      <UserProfileModal
+        userId={listing.landlord_id}
+        onClose={() => setViewingHost(false)}
+        onOpenListing={(l) => {
+          setViewingHost(false);
+          navigate(`/habitacion/${l.id}`);
+        }}
+      />
+    )}
+    </>
   );
 }

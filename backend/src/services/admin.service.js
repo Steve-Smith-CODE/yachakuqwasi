@@ -3,7 +3,7 @@ import {
   countHousings,
   countPendingDocuments,
   findPendingDocuments,
-  updateDocumentStatus,
+  updateDocumentsStatusForUser,
   updateProfileVerification,
   findPendingHousings,
   updateHousingStatusRecord,
@@ -14,9 +14,13 @@ import {
   insertAuditLog,
   findAuditLogs
 } from '../repositories/admin.repository.js';
-import { findHousingById } from '../repositories/housing.repository.js';
-import { notifyLandlordOfHousingReview } from './notifications.service.js';
+import { findHousingById, findHousingsByLandlord } from '../repositories/housing.repository.js';
+import { findProfileById, findAuthUserById, deleteAuthUser } from '../repositories/auth.repository.js';
+import { notifyLandlordOfHousingReview, notifyUserOfBlock, notifyUserOfReactivation } from './notifications.service.js';
 import { invalidateHousingCache } from './housing.service.js';
+import { getStudentStats, getLandlordStats } from './stats.service.js';
+import { listFavorites } from './favorites.service.js';
+import { NotFoundError } from '../errors/AppError.js';
 import logger from '../config/logger.js';
 
 const LOG_SCOPE_TYPES = {
@@ -50,8 +54,12 @@ export async function getPendingDocuments() {
   return data;
 }
 
-export async function reviewDocument(docId, { estado, comentario }, actor) {
-  const { data: doc, error } = await updateDocumentStatus(docId, { status: estado, comment: comentario });
+// Revisa DNI + carnet de un usuario como una sola decision (no documento por
+// documento) - asi nunca queda "verificado" con solo la mitad de sus
+// credenciales revisadas. Aprobar/rechazar sin documentos pendientes es un
+// 404: no hay nada que revisar (ya se revisaron o nunca los subio).
+export async function reviewUserDocuments(userId, { estado, comentario }, actor) {
+  const { data: updated, error } = await updateDocumentsStatusForUser(userId, { status: estado, comment: comentario });
 
   if (error) {
     const err = new Error(error.message);
@@ -59,24 +67,28 @@ export async function reviewDocument(docId, { estado, comentario }, actor) {
     throw err;
   }
 
+  if (!updated?.length) {
+    throw new NotFoundError('Documentos de verificación pendientes');
+  }
+
   if (estado === 'approved') {
-    await updateProfileVerification(doc.user_id, { is_verified: true, verification_status: 'approved' });
+    await updateProfileVerification(userId, { is_verified: true, verification_status: 'approved' });
   } else if (estado === 'rejected') {
-    await updateProfileVerification(doc.user_id, { verification_status: 'rejected' });
+    await updateProfileVerification(userId, { verification_status: 'rejected' });
   }
 
   const { error: auditError } = await insertAuditLog({
     userId: actor?.id,
     actorName: actor?.name ?? 'Admin',
-    action: estado === 'approved' ? 'Aprobó credencial' : 'Rechazó credencial',
-    details: `Documento ${docId} marcado como ${estado}.`,
+    action: estado === 'approved' ? 'Aprobó credenciales' : 'Rechazó credenciales',
+    details: `Usuario ${userId}: ${updated.length} documento(s) marcado(s) como ${estado}.`,
     type: 'user'
   });
   if (auditError) {
-    logger.warn(`No se pudo registrar la auditoría del documento ${docId}: ${auditError.message}`);
+    logger.warn(`No se pudo registrar la auditoría de credenciales de ${userId}: ${auditError.message}`);
   }
 
-  return doc;
+  return updated;
 }
 
 export async function getPendingHousings() {
@@ -152,15 +164,83 @@ export async function blockUser(userId, { motivo, dias }, actor) {
   const { error: auditError } = await insertAuditLog({
     userId: actor?.id,
     actorName: actor?.name ?? 'Admin',
-    action: 'Bloqueó usuario',
-    details: `Usuario ${userId} bloqueado. Motivo: ${motivo}`,
+    action: dias ? 'Suspendió usuario' : 'Bloqueó usuario',
+    details: `Usuario ${userId} ${dias ? `suspendido ${dias} día(s)` : 'bloqueado'}. Motivo: ${motivo}`,
     type: 'user'
   });
   if (auditError) {
     logger.warn(`No se pudo registrar la auditoría del bloqueo de ${userId}: ${auditError.message}`);
   }
 
+  try {
+    await notifyUserOfBlock({ userId, motivo, blockedUntil });
+  } catch (err) {
+    logger.warn(`No se pudo notificar el bloqueo a ${userId}: ${err.message}`);
+  }
+
   return { message: 'Usuario bloqueado' };
+}
+
+export async function unblockUser(userId, actor) {
+  const { error } = await updateProfileBlock(userId, { blockedUntil: null, motivo: null });
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const { error: auditError } = await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: 'Reactivó cuenta',
+    details: `Usuario ${userId} reactivado.`,
+    type: 'user'
+  });
+  if (auditError) {
+    logger.warn(`No se pudo registrar la auditoría de la reactivación de ${userId}: ${auditError.message}`);
+  }
+
+  try {
+    await notifyUserOfReactivation(userId);
+  } catch (err) {
+    logger.warn(`No se pudo notificar la reactivación a ${userId}: ${err.message}`);
+  }
+
+  return { message: 'Usuario reactivado' };
+}
+
+// Borrado duro e irreversible: por el "on delete cascade" del esquema, si el
+// usuario es arrendador esto se lleva tambien todas sus publicaciones,
+// favoritos y chats. El frontend tiene que advertirlo antes de llamar esto -
+// no es lo mismo que bloquear/suspender (reversible).
+export async function deleteUserAccount(userId, { motivo }, actor) {
+  const { data: profile, error: profileError } = await findProfileById(userId);
+
+  if (profileError || !profile) {
+    throw new NotFoundError('Usuario');
+  }
+
+  const { error } = await deleteAuthUser(userId);
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const { error: auditError } = await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: 'Eliminó cuenta',
+    details: `Cuenta de '${profile.name}' (${profile.role}) eliminada. Motivo: ${motivo}`,
+    type: 'user'
+  });
+  if (auditError) {
+    logger.warn(`No se pudo registrar la auditoría de la eliminación de ${userId}: ${auditError.message}`);
+  }
+
+  return { message: 'Cuenta eliminada' };
 }
 
 export async function getAllHousingsAdmin() {
@@ -220,4 +300,49 @@ export async function getAuditLogs(scope) {
   }
 
   return data;
+}
+
+// Vista de solo lectura para que el admin "visite" el perfil de un
+// estudiante/arrendador sin suplantarlo: perfil + email (solo en auth.users,
+// no en profiles) + sus stats/listings o favoritos segun el rol + su rastro
+// de auditoria completo (moderacion recibida + sus propias ediciones).
+export async function getUserDetail(userId) {
+  const { data: profile, error } = await findProfileById(userId);
+
+  if (error || !profile) {
+    throw new NotFoundError('Usuario');
+  }
+
+  const [{ data: authUser }, { data: activity, error: activityError }] = await Promise.all([
+    findAuthUserById(userId),
+    findAuditLogs({ userId })
+  ]);
+
+  if (activityError) {
+    const err = new Error(activityError.message);
+    err.statusCode = 500;
+    throw err;
+  }
+
+  let stats = null;
+  let listings = [];
+  let favorites = [];
+
+  if (profile.role === 'landlord') {
+    const [landlordStats, listingsResult] = await Promise.all([getLandlordStats(userId), findHousingsByLandlord(userId)]);
+    stats = landlordStats;
+    listings = listingsResult.data || [];
+  } else if (profile.role === 'student') {
+    const [studentStats, favs] = await Promise.all([getStudentStats(userId), listFavorites(userId)]);
+    stats = studentStats;
+    favorites = favs;
+  }
+
+  return {
+    profile: { ...profile, email: authUser?.user?.email ?? null },
+    stats,
+    listings,
+    favorites,
+    activity: activity || []
+  };
 }

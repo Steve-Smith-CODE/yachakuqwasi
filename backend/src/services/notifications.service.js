@@ -91,3 +91,46 @@ export async function notifyAdminsOfHousingPendingReview({ listingId, listingTit
 export async function notifyAdminsOfNewHousing({ listingId, listingTitle, actorId }) {
   return notifyAdminsOfHousingPendingReview({ listingId, listingTitle, actorId });
 }
+
+const ROLE_LABEL = { student: 'estudiante', landlord: 'arrendador' };
+
+// actor_id ya es una FK nullable a profiles (se usaba para "quien disparo la
+// notificacion"); para este tipo la reusamos para apuntar al usuario recien
+// registrado, asi el admin puede abrir su perfil desde la notificacion sin
+// necesitar una columna nueva.
+export async function notifyAdminsOfNewUser({ userId, userName, role }) {
+  const { data: admins, error } = await findAdminIds();
+  if (error || !admins?.length) return;
+
+  const rows = admins.map((admin) => ({
+    recipient_id: admin.id,
+    actor_id: userId,
+    type: 'new_user',
+    title: 'Nuevo usuario registrado',
+    body: `${userName} se registró como ${ROLE_LABEL[role] || role}`
+  }));
+
+  await insertNotifications(rows);
+}
+
+export async function notifyUserOfBlock({ userId, motivo, blockedUntil }) {
+  await insertNotifications([
+    {
+      recipient_id: userId,
+      type: 'account_blocked',
+      title: blockedUntil ? 'Tu cuenta fue suspendida temporalmente' : 'Tu cuenta fue bloqueada',
+      body: motivo
+    }
+  ]);
+}
+
+export async function notifyUserOfReactivation(userId) {
+  await insertNotifications([
+    {
+      recipient_id: userId,
+      type: 'account_reactivated',
+      title: 'Tu cuenta fue reactivada',
+      body: 'Ya puedes volver a usar tu cuenta con normalidad.'
+    }
+  ]);
+}

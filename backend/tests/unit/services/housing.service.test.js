@@ -1,4 +1,11 @@
-import { createHousing, listHousings, listMyHousings, addHousingImages, getHousingById } from '../../../src/services/housing.service.js';
+import {
+  createHousing,
+  listHousings,
+  listMyHousings,
+  addHousingImages,
+  getHousingById,
+  deleteHousing
+} from '../../../src/services/housing.service.js';
 import * as housingRepo from '../../../src/repositories/housing.repository.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
@@ -46,6 +53,32 @@ describe('Housing Service (Supabase local real)', () => {
           contactPhone: '900000000'
         })
       ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('registra la creacion en audit_logs como landlord_activity', async () => {
+      const landlord = await createRealUser({ role: 'landlord', name: 'Arrendador Audit Create' });
+
+      const listing = await createHousing(
+        landlord.id,
+        {
+          title: 'Habitacion audit al crear',
+          pricePen: 300,
+          distanceToUnschMinutes: 12,
+          neighborhood: 'San Blas',
+          address: 'Jr. Audit Create 1',
+          contactPhone: '966000000'
+        },
+        { id: landlord.id, name: landlord.name, role: 'landlord' }
+      );
+      createdListingIds.push(listing.id);
+
+      const { data: log } = await supabaseAdmin
+        .from('audit_logs')
+        .select('*')
+        .eq('listing_id', listing.id)
+        .eq('action', 'Creó anuncio')
+        .maybeSingle();
+      expect(log?.type).toBe('landlord_activity');
     });
   });
 
@@ -342,6 +375,56 @@ describe('Housing Service (Supabase local real)', () => {
 
       const updated = await addHousingImages(listing.id, { id: admin.id, role: 'admin' }, [TINY_IMAGE]);
       expect(updated).toBeDefined();
+    });
+  });
+
+  describe('deleteHousing', () => {
+    it('el propio arrendador elimina su anuncio y el log queda como landlord_activity', async () => {
+      const landlord = await createRealUser({ role: 'landlord', name: 'Dueño Real Delete' });
+      const listing = await createHousing(landlord.id, {
+        title: 'Habitacion a eliminar por su dueño',
+        pricePen: 200,
+        distanceToUnschMinutes: 8,
+        neighborhood: 'San Blas',
+        address: 'Jr. Delete Dueño 1',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+
+      const updated = await deleteHousing(listing.id, { id: landlord.id, name: landlord.name, role: 'landlord' }, 'rented');
+      expect(updated.deleted_at).toBeTruthy();
+
+      const { data: logs } = await supabaseAdmin
+        .from('audit_logs')
+        .select('*')
+        .eq('listing_id', listing.id)
+        .eq('action', 'Eliminó anuncio');
+      expect(logs.some((l) => l.type === 'landlord_activity')).toBe(true);
+    });
+
+    it('un admin elimina el anuncio de otro y el log queda como listing, no landlord_activity', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await createHousing(landlord.id, {
+        title: 'Habitacion a eliminar por admin',
+        pricePen: 200,
+        distanceToUnschMinutes: 8,
+        neighborhood: 'San Blas',
+        address: 'Jr. Delete Admin 1',
+        contactPhone: '900000000'
+      });
+      createdListingIds.push(listing.id);
+      const admin = await createRealUser({ role: 'admin', name: 'Admin Real Delete' });
+
+      const updated = await deleteHousing(listing.id, { id: admin.id, name: admin.name, role: 'admin' });
+      expect(updated.deleted_at).toBeTruthy();
+
+      const { data: logs } = await supabaseAdmin
+        .from('audit_logs')
+        .select('*')
+        .eq('listing_id', listing.id)
+        .eq('action', 'Eliminó anuncio');
+      expect(logs.some((l) => l.type === 'listing')).toBe(true);
+      expect(logs.some((l) => l.type === 'landlord_activity')).toBe(false);
     });
   });
 });

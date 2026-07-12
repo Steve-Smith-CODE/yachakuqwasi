@@ -18,11 +18,16 @@ export function insertChat({ studentId, landlordId, listingId }) {
     .single();
 }
 
+// Trae el perfil de AMBOS participantes (no solo "el otro") porque en este
+// punto no sabemos cual columna del select corresponde a quien sin otra
+// consulta - el service/frontend elige segun su propio rol cual mostrar.
 export function findChatsForUser(userId, role) {
   const column = role === 'landlord' ? 'landlord_id' : 'student_id';
   return supabaseAdmin
     .from('chats')
-    .select('*, housing_listings(title)')
+    .select(
+      '*, housing_listings(title), student:profiles!chats_student_id_fkey(id, name, avatar_url), landlord:profiles!chats_landlord_id_fkey(id, name, avatar_url)'
+    )
     .eq(column, userId)
     .order('updated_at', { ascending: false });
 }

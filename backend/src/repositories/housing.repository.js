@@ -17,7 +17,7 @@ export function findApprovedHousings({ tipo, precioMax, barrio, q, page = 1, lim
 
   let query = supabaseAdmin
     .from('housing_listings')
-    .select('*, profiles!housing_listings_landlord_id_fkey(name)')
+    .select('*, profiles!housing_listings_landlord_id_fkey(name, avatar_url)')
     .eq('status', 'approved')
     .is('paused_at', null)
     .is('deleted_at', null)
@@ -48,7 +48,7 @@ export function findHousingById(id) {
 export function findApprovedHousingById(id) {
   return supabaseAdmin
     .from('housing_listings')
-    .select('*, profiles!housing_listings_landlord_id_fkey(name)')
+    .select('*, profiles!housing_listings_landlord_id_fkey(name, avatar_url)')
     .eq('id', id)
     .eq('status', 'approved')
     .is('paused_at', null)
@@ -63,6 +63,21 @@ export function findHousingsByLandlord(landlordId) {
     .from('housing_listings')
     .select('*')
     .eq('landlord_id', landlordId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false });
+}
+
+// Para el perfil publico de un arrendador (lo que ve otro usuario, no el
+// propio admin ni el propio arrendador): solo lo mismo que ya veria en el
+// explorador - aprobado, visible y no eliminado. Nada de pendientes/pausados,
+// esa es info de moderacion interna.
+export function findApprovedHousingsByLandlord(landlordId) {
+  return supabaseAdmin
+    .from('housing_listings')
+    .select('*')
+    .eq('landlord_id', landlordId)
+    .eq('status', 'approved')
+    .is('paused_at', null)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 }

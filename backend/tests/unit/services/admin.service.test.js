@@ -1,14 +1,17 @@
 import {
   getStats,
   getPendingDocuments,
-  reviewDocument,
+  reviewUserDocuments,
   getPendingHousings,
   updateHousingStatus,
   blockUser,
+  unblockUser,
+  deleteUserAccount,
   getAllHousingsAdmin,
   getAllUsers,
   setUserRole,
-  getAuditLogs
+  getAuditLogs,
+  getUserDetail
 } from '../../../src/services/admin.service.js';
 import * as adminRepo from '../../../src/repositories/admin.repository.js';
 import * as notificationsService from '../../../src/services/notifications.service.js';
@@ -80,68 +83,79 @@ describe('Admin Service (Supabase local real)', () => {
     });
   });
 
-  describe('getPendingDocuments + reviewDocument', () => {
-    it('lista un documento pendiente real y lo aprueba, verificando el perfil', async () => {
+  describe('getPendingDocuments + reviewUserDocuments', () => {
+    it('lista DNI+carnet pendientes reales y los aprueba juntos en una sola decision, verificando el perfil', async () => {
       const student = await createRealUser({ role: 'student' });
 
-      const { data: doc } = await supabaseAdmin
+      const { data: docs } = await supabaseAdmin
         .from('verification_documents')
-        .insert({ user_id: student.id, doc_url: 'https://example.com/carnet.png', status: 'pending' })
-        .select()
-        .single();
-      createdDocIds.push(doc.id);
+        .insert([
+          { user_id: student.id, doc_url: 'https://example.com/dni.png', doc_type: 'dni', status: 'pending' },
+          { user_id: student.id, doc_url: 'https://example.com/carnet.png', doc_type: 'carnet', status: 'pending' }
+        ])
+        .select();
+      docs.forEach((d) => createdDocIds.push(d.id));
 
       const pending = await getPendingDocuments();
-      expect(pending.map((d) => d.id)).toContain(doc.id);
+      expect(docs.every((d) => pending.map((p) => p.id).includes(d.id))).toBe(true);
 
-      const reviewed = await reviewDocument(doc.id, { estado: 'approved', comentario: 'Documento valido' });
-      expect(reviewed.status).toBe('approved');
+      const reviewed = await reviewUserDocuments(student.id, { estado: 'approved', comentario: 'Documentos validos' });
+      expect(reviewed).toHaveLength(2);
+      expect(reviewed.every((d) => d.status === 'approved')).toBe(true);
 
       const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
       expect(profile.is_verified).toBe(true);
       expect(profile.verification_status).toBe('approved');
     });
 
-    it('rechaza un documento real y actualiza el estado de verificacion del perfil', async () => {
+    it('rechaza ambos documentos reales y actualiza el estado de verificacion del perfil', async () => {
       const student = await createRealUser({ role: 'student' });
 
-      const { data: doc } = await supabaseAdmin
+      const { data: docs } = await supabaseAdmin
         .from('verification_documents')
-        .insert({ user_id: student.id, doc_url: 'https://example.com/borroso.png', status: 'pending' })
-        .select()
-        .single();
-      createdDocIds.push(doc.id);
+        .insert([
+          { user_id: student.id, doc_url: 'https://example.com/dni-borroso.png', doc_type: 'dni', status: 'pending' },
+          { user_id: student.id, doc_url: 'https://example.com/carnet-borroso.png', doc_type: 'carnet', status: 'pending' }
+        ])
+        .select();
+      docs.forEach((d) => createdDocIds.push(d.id));
 
-      await reviewDocument(doc.id, { estado: 'rejected', comentario: 'Ilegible' });
+      await reviewUserDocuments(student.id, { estado: 'rejected', comentario: 'Ilegibles' });
 
       const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
       expect(profile.verification_status).toBe('rejected');
       expect(profile.is_verified).toBe(false);
     });
 
-    it('lanza error con statusCode 400 si el documento no existe (real: .single() sin filas)', async () => {
-      const inexistente = '00000000-0000-0000-0000-000000000000';
+    it('lanza NotFoundError (404) si el usuario no tiene documentos pendientes', async () => {
+      const student = await createRealUser({ role: 'student' });
 
-      await expect(reviewDocument(inexistente, { estado: 'approved', comentario: 'x' })).rejects.toMatchObject({
+      await expect(reviewUserDocuments(student.id, { estado: 'approved', comentario: 'x' })).rejects.toMatchObject({
+        statusCode: 404
+      });
+    });
+
+    it('lanza error con statusCode 400 si el userId no es un uuid valido (error real de Postgres)', async () => {
+      await expect(reviewUserDocuments('esto-no-es-un-uuid', { estado: 'approved' })).rejects.toMatchObject({
         statusCode: 400
       });
     });
 
     it('no actualiza verification_status si estado no es approved ni rejected', async () => {
-      const originalUpdateDoc = adminRepo.updateDocumentStatus;
+      const originalUpdateDocs = adminRepo.updateDocumentsStatusForUser;
       const originalUpdateVerif = adminRepo.updateProfileVerification;
-      adminRepo.updateDocumentStatus = jest.fn().mockResolvedValue({
-        data: { id: 'fake-doc', user_id: 'fake-user' },
+      adminRepo.updateDocumentsStatusForUser = jest.fn().mockResolvedValue({
+        data: [{ id: 'fake-doc', user_id: 'fake-user' }],
         error: null
       });
       adminRepo.updateProfileVerification = jest.fn();
 
       try {
-        const result = await reviewDocument('fake-doc', { estado: 'otro-estado' });
-        expect(result.id).toBe('fake-doc');
+        const result = await reviewUserDocuments('fake-user', { estado: 'otro-estado' });
+        expect(result).toHaveLength(1);
         expect(adminRepo.updateProfileVerification).not.toHaveBeenCalled();
       } finally {
-        adminRepo.updateDocumentStatus = originalUpdateDoc;
+        adminRepo.updateDocumentsStatusForUser = originalUpdateDocs;
         adminRepo.updateProfileVerification = originalUpdateVerif;
       }
     });
@@ -235,21 +249,81 @@ describe('Admin Service (Supabase local real)', () => {
         statusCode: 400
       });
     });
+
+    it('notifica al usuario bloqueado con el motivo', async () => {
+      const student = await createRealUser({ role: 'student' });
+      const originalFn = notificationsService.notifyUserOfBlock;
+      notificationsService.notifyUserOfBlock = jest.fn().mockResolvedValue(undefined);
+
+      try {
+        await blockUser(student.id, { motivo: 'Publicaciones falsas', dias: 3 });
+
+        expect(notificationsService.notifyUserOfBlock).toHaveBeenCalledWith(
+          expect.objectContaining({ userId: student.id, motivo: 'Publicaciones falsas' })
+        );
+      } finally {
+        notificationsService.notifyUserOfBlock = originalFn;
+      }
+    });
+
+    it('no lanza error si falla la notificacion al usuario bloqueado', async () => {
+      const student = await createRealUser({ role: 'student' });
+      const originalFn = notificationsService.notifyUserOfBlock;
+      notificationsService.notifyUserOfBlock = jest.fn().mockRejectedValue(new Error('Notify failed'));
+
+      try {
+        const result = await blockUser(student.id, { motivo: 'x' });
+        expect(result).toEqual({ message: 'Usuario bloqueado' });
+      } finally {
+        notificationsService.notifyUserOfBlock = originalFn;
+      }
+    });
   });
 
-  describe('reviewDocument - Estado Rejected', () => {
-    it('rechaza un documento y deja al usuario sin verificar', async () => {
+  describe('unblockUser', () => {
+    it('limpia blocked_until/blocked_reason de un usuario real', async () => {
+      const student = await createRealUser({ role: 'student' });
+      await blockUser(student.id, { motivo: 'Temporal', dias: 5 });
+
+      const result = await unblockUser(student.id, { id: 'admin-id', name: 'Admin Test' });
+      expect(result).toEqual({ message: 'Usuario reactivado' });
+
+      const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
+      expect(profile.blocked_reason).toBeNull();
+      expect(profile.blocked_until).toBeNull();
+    });
+
+    it('lanza error con statusCode 400 si el id no es un uuid valido', async () => {
+      await expect(unblockUser('esto-no-es-un-uuid')).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    it('no lanza error si falla la notificacion de reactivacion', async () => {
+      const student = await createRealUser({ role: 'student' });
+      const originalFn = notificationsService.notifyUserOfReactivation;
+      notificationsService.notifyUserOfReactivation = jest.fn().mockRejectedValue(new Error('Notify failed'));
+
+      try {
+        const result = await unblockUser(student.id);
+        expect(result).toEqual({ message: 'Usuario reactivado' });
+      } finally {
+        notificationsService.notifyUserOfReactivation = originalFn;
+      }
+    });
+  });
+
+  describe('reviewUserDocuments - Estado Rejected', () => {
+    it('rechaza un unico documento pendiente y deja al usuario sin verificar', async () => {
       const student = await createRealUser({ role: 'student' });
 
       const { data: doc } = await supabaseAdmin
         .from('verification_documents')
-        .insert({ user_id: student.id, doc_url: 'https://example.com/invalido.png', status: 'pending' })
+        .insert({ user_id: student.id, doc_url: 'https://example.com/invalido.png', doc_type: 'dni', status: 'pending' })
         .select()
         .single();
       createdDocIds.push(doc.id);
 
-      const reviewed = await reviewDocument(doc.id, { estado: 'rejected', comentario: 'Documento borroso' });
-      expect(reviewed.status).toBe('rejected');
+      const reviewed = await reviewUserDocuments(student.id, { estado: 'rejected', comentario: 'Documento borroso' });
+      expect(reviewed[0].status).toBe('rejected');
 
       const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).single();
       expect(profile.verification_status).toBe('rejected');
@@ -353,20 +427,21 @@ describe('Admin Service (Supabase local real)', () => {
   });
 
   describe('getAuditLogs', () => {
-    it('devuelve el log real generado al aprobar un documento', async () => {
+    it('devuelve el log real generado al aprobar los documentos de un usuario', async () => {
       const student = await createRealUser({ role: 'student' });
+      const admin = await createRealUser({ role: 'admin', name: 'Admin Auditoria' });
       const { data: doc } = await supabaseAdmin
         .from('verification_documents')
-        .insert({ user_id: student.id, doc_url: 'https://example.com/audit.png', status: 'pending' })
+        .insert({ user_id: student.id, doc_url: 'https://example.com/audit.png', doc_type: 'dni', status: 'pending' })
         .select()
         .single();
       createdDocIds.push(doc.id);
 
-      await reviewDocument(doc.id, { estado: 'approved', comentario: 'ok' }, { id: student.id, name: 'Admin Test' });
+      await reviewUserDocuments(student.id, { estado: 'approved', comentario: 'ok' }, { id: admin.id, name: admin.name });
 
       const logs = await getAuditLogs();
 
-      expect(logs.some((l) => l.details?.includes(doc.id))).toBe(true);
+      expect(logs.some((l) => l.details?.includes(student.id))).toBe(true);
     });
 
     it('lanza error con statusCode 500 si el repositorio falla', async () => {
@@ -378,6 +453,102 @@ describe('Admin Service (Supabase local real)', () => {
       } finally {
         adminRepo.findAuditLogs = originalFn;
       }
+    });
+  });
+
+  describe('getUserDetail', () => {
+    it('lanza NotFoundError (404) si el usuario no existe', async () => {
+      const inexistente = '00000000-0000-0000-0000-000000000000';
+
+      await expect(getUserDetail(inexistente)).rejects.toMatchObject({ statusCode: 404 });
+    });
+
+    it('arrendador real: perfil + email + stats + sus publicaciones', async () => {
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await insertPendingHousing(landlord.id, { title: 'Anuncio del detalle admin' });
+
+      const detail = await getUserDetail(landlord.id);
+
+      expect(detail.profile.id).toBe(landlord.id);
+      expect(detail.profile.email).toBe(landlord.email);
+      expect(detail.profile.role).toBe('landlord');
+      expect(detail.stats).toHaveProperty('totalListings');
+      expect(detail.listings.map((l) => l.id)).toContain(listing.id);
+      expect(Array.isArray(detail.activity)).toBe(true);
+    });
+
+    it('estudiante real: perfil + stats + sus favoritos', async () => {
+      const student = await createRealUser({ role: 'student' });
+      const landlord = await createRealUser({ role: 'landlord' });
+      const listing = await insertPendingHousing(landlord.id, { title: 'Anuncio favorito del detalle admin' });
+      await supabaseAdmin.from('favorites').insert({ user_id: student.id, listing_id: listing.id });
+
+      const detail = await getUserDetail(student.id);
+
+      expect(detail.profile.id).toBe(student.id);
+      expect(detail.profile.role).toBe('student');
+      expect(detail.stats).toHaveProperty('savedFavorites');
+      expect(detail.favorites.map((l) => l.id)).toContain(listing.id);
+    });
+
+    it('lanza error con statusCode 500 si falla la consulta de actividad', async () => {
+      const student = await createRealUser({ role: 'student' });
+      const originalFn = adminRepo.findAuditLogs;
+      adminRepo.findAuditLogs = jest.fn().mockResolvedValue({ data: null, error: { message: 'fail' } });
+
+      try {
+        await expect(getUserDetail(student.id)).rejects.toMatchObject({ statusCode: 500 });
+      } finally {
+        adminRepo.findAuditLogs = originalFn;
+      }
+    });
+
+    it('admin real: sin stats/listings/favoritos (ningun rol de estudiante/arrendador)', async () => {
+      const admin = await createRealUser({ role: 'admin' });
+
+      const detail = await getUserDetail(admin.id);
+
+      expect(detail.profile.role).toBe('admin');
+      expect(detail.stats).toBeNull();
+      expect(detail.listings).toEqual([]);
+      expect(detail.favorites).toEqual([]);
+    });
+  });
+
+  describe('deleteUserAccount', () => {
+    it('borra al usuario real de auth.users y deja de existir su perfil', async () => {
+      const student = await createRealUser({ role: 'student', name: 'A Eliminar' });
+
+      const result = await deleteUserAccount(student.id, { motivo: 'Cuenta de prueba' }, { id: 'admin-id', name: 'Admin Test' });
+      expect(result).toEqual({ message: 'Cuenta eliminada' });
+
+      const { data: profile } = await supabaseAdmin.from('profiles').select('*').eq('id', student.id).maybeSingle();
+      expect(profile).toBeNull();
+    });
+
+    it('registra la auditoria con el nombre y rol del usuario eliminado en los detalles', async () => {
+      // El actor debe ser un usuario real: audit_logs.user_id es FK a
+      // profiles, un id inventado hace fallar el insert en silencio (mismo
+      // try/catch resiliente que ya usan blockUser/unblockUser) y no queda log.
+      const admin = await createRealUser({ role: 'admin', name: 'Admin Que Elimina' });
+      const student = await createRealUser({ role: 'student', name: 'Auditado Al Eliminar' });
+
+      await deleteUserAccount(student.id, { motivo: 'Spam' }, { id: admin.id, name: admin.name });
+
+      const { data: logs } = await supabaseAdmin
+        .from('audit_logs')
+        .select('*')
+        .eq('action', 'Eliminó cuenta')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      expect(logs[0].details).toContain('Auditado Al Eliminar');
+      expect(logs[0].details).toContain('Spam');
+    });
+
+    it('lanza NotFoundError (404) si el usuario no existe', async () => {
+      const inexistente = '00000000-0000-0000-0000-000000000000';
+
+      await expect(deleteUserAccount(inexistente, { motivo: 'x' })).rejects.toMatchObject({ statusCode: 404 });
     });
   });
 });

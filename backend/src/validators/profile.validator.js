@@ -16,3 +16,13 @@ export const updatePasswordSchema = z.object({
 export const updateAvatarSchema = z.object({
   image: z.string().min(1, 'La imagen es obligatoria')
 });
+
+// Autodeclarado, no verificado por link de confirmación (no hay proveedor de
+// correo transaccional configurado en el proyecto) - es una señal de
+// confianza complementaria a la revisión manual de documentos, no la reemplaza.
+export const institutionalEmailSchema = z.object({
+  institutionalEmail: z
+    .string()
+    .email('Correo inválido')
+    .refine((email) => email.toLowerCase().endsWith('.edu.pe'), 'Debe ser un correo institucional (.edu.pe)')
+});

@@ -3,7 +3,10 @@ import {
   markAsRead,
   markAllAsRead,
   notifyLandlordOfHousingReview,
-  notifyAdminsOfNewHousing
+  notifyAdminsOfNewHousing,
+  notifyAdminsOfNewUser,
+  notifyUserOfBlock,
+  notifyUserOfReactivation
 } from '../../../src/services/notifications.service.js';
 import * as notificationsRepo from '../../../src/repositories/notifications.repository.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
@@ -195,6 +198,94 @@ describe('Notifications Service (Supabase local real)', () => {
         expect(notifications.some((n) => n.type === 'listing_pending_review')).toBe(true);
       } finally {
         notificationsRepo.findAdminIds = originalFn;
+      }
+    });
+  });
+
+  // notifyAdminsOfNewUser/notifyUserOfBlock/notifyUserOfReactivation usan
+  // tipos de notification_type agregados en 20260712000000_add_user_notifications.sql;
+  // se verifica la forma del insert con un mock (no insert real) para que el
+  // test no dependa de que esa migracion ya este aplicada en Supabase.
+  describe('notifyAdminsOfNewUser', () => {
+    it('no inserta nada si no hay administradores', async () => {
+      const originalFn = notificationsRepo.findAdminIds;
+      notificationsRepo.findAdminIds = jest.fn().mockResolvedValue({ data: [], error: null });
+      const insertSpy = jest.spyOn(notificationsRepo, 'insertNotifications');
+
+      try {
+        await notifyAdminsOfNewUser({ userId: 'nuevo-user-id', userName: 'Nuevo Usuario', role: 'student' });
+        expect(insertSpy).not.toHaveBeenCalled();
+      } finally {
+        notificationsRepo.findAdminIds = originalFn;
+        insertSpy.mockRestore();
+      }
+    });
+
+    it('inserta una fila por admin con actor_id apuntando al usuario nuevo', async () => {
+      const originalFindAdmins = notificationsRepo.findAdminIds;
+      const originalInsert = notificationsRepo.insertNotifications;
+      notificationsRepo.findAdminIds = jest.fn().mockResolvedValue({ data: [{ id: 'admin-1' }, { id: 'admin-2' }], error: null });
+      notificationsRepo.insertNotifications = jest.fn().mockResolvedValue({ data: [], error: null });
+
+      try {
+        await notifyAdminsOfNewUser({ userId: 'nuevo-user-id', userName: 'Nuevo Usuario', role: 'landlord' });
+
+        expect(notificationsRepo.insertNotifications).toHaveBeenCalledWith([
+          expect.objectContaining({ recipient_id: 'admin-1', actor_id: 'nuevo-user-id', type: 'new_user' }),
+          expect.objectContaining({ recipient_id: 'admin-2', actor_id: 'nuevo-user-id', type: 'new_user' })
+        ]);
+      } finally {
+        notificationsRepo.findAdminIds = originalFindAdmins;
+        notificationsRepo.insertNotifications = originalInsert;
+      }
+    });
+  });
+
+  describe('notifyUserOfBlock', () => {
+    it('inserta type account_blocked con el motivo en el body', async () => {
+      const originalInsert = notificationsRepo.insertNotifications;
+      notificationsRepo.insertNotifications = jest.fn().mockResolvedValue({ data: [], error: null });
+
+      try {
+        await notifyUserOfBlock({ userId: 'user-bloqueado', motivo: 'Publicaciones fraudulentas', blockedUntil: null });
+
+        expect(notificationsRepo.insertNotifications).toHaveBeenCalledWith([
+          expect.objectContaining({ recipient_id: 'user-bloqueado', type: 'account_blocked', body: 'Publicaciones fraudulentas' })
+        ]);
+      } finally {
+        notificationsRepo.insertNotifications = originalInsert;
+      }
+    });
+
+    it('usa titulo de suspension temporal si hay blockedUntil', async () => {
+      const originalInsert = notificationsRepo.insertNotifications;
+      notificationsRepo.insertNotifications = jest.fn().mockResolvedValue({ data: [], error: null });
+
+      try {
+        await notifyUserOfBlock({ userId: 'user-suspendido', motivo: 'Spam', blockedUntil: new Date().toISOString() });
+
+        expect(notificationsRepo.insertNotifications).toHaveBeenCalledWith([
+          expect.objectContaining({ title: 'Tu cuenta fue suspendida temporalmente' })
+        ]);
+      } finally {
+        notificationsRepo.insertNotifications = originalInsert;
+      }
+    });
+  });
+
+  describe('notifyUserOfReactivation', () => {
+    it('inserta type account_reactivated para el usuario', async () => {
+      const originalInsert = notificationsRepo.insertNotifications;
+      notificationsRepo.insertNotifications = jest.fn().mockResolvedValue({ data: [], error: null });
+
+      try {
+        await notifyUserOfReactivation('user-reactivado');
+
+        expect(notificationsRepo.insertNotifications).toHaveBeenCalledWith([
+          expect.objectContaining({ recipient_id: 'user-reactivado', type: 'account_reactivated' })
+        ]);
+      } finally {
+        notificationsRepo.insertNotifications = originalInsert;
       }
     });
   });

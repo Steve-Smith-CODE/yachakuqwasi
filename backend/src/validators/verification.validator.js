@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
 export const submitVerificationSchema = z.object({
-  image: z.string().min(1, 'La imagen es obligatoria')
+  dni: z.string().min(1, 'La foto del DNI es obligatoria'),
+  carnet: z.string().min(1, 'La foto del carnet o constancia de matrícula es obligatoria')
 });

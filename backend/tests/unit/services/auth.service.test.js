@@ -1,5 +1,7 @@
 import { registerUser, loginUser, forgotPassword } from '../../../src/services/auth.service.js';
 import * as authRepo from '../../../src/repositories/auth.repository.js';
+import * as notificationsService from '../../../src/services/notifications.service.js';
+import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers, trackUserForCleanup, uniqueEmail } from '../../helpers/testData.js';
 
 afterAll(async () => {
@@ -30,6 +32,40 @@ describe('Auth Service (Supabase local real)', () => {
         registerUser({ email: existing.email, password: 'OtherPass123!', name: 'Duplicado' })
       ).rejects.toMatchObject({ statusCode: 400 });
     });
+
+    it('notifica a los admins con el nombre y rol del usuario recien creado', async () => {
+      const originalFn = notificationsService.notifyAdminsOfNewUser;
+      notificationsService.notifyAdminsOfNewUser = jest.fn().mockResolvedValue(undefined);
+      const email = uniqueEmail('register-notify');
+
+      try {
+        const result = await registerUser({ email, password: 'TestPass123!', name: 'Notificado', role: 'landlord' });
+        trackUserForCleanup(result.id);
+
+        expect(notificationsService.notifyAdminsOfNewUser).toHaveBeenCalledWith({
+          userId: result.id,
+          userName: 'Notificado',
+          role: 'landlord'
+        });
+      } finally {
+        notificationsService.notifyAdminsOfNewUser = originalFn;
+      }
+    });
+
+    it('el registro no falla aunque la notificacion a los admins falle', async () => {
+      const originalFn = notificationsService.notifyAdminsOfNewUser;
+      notificationsService.notifyAdminsOfNewUser = jest.fn().mockRejectedValue(new Error('Notify failed'));
+      const email = uniqueEmail('register-notify-fail');
+
+      try {
+        const result = await registerUser({ email, password: 'TestPass123!', name: 'Sin Notificacion' });
+        trackUserForCleanup(result.id);
+
+        expect(result.email).toBe(email);
+      } finally {
+        notificationsService.notifyAdminsOfNewUser = originalFn;
+      }
+    });
   });
 
   describe('loginUser', () => {
@@ -55,6 +91,25 @@ describe('Auth Service (Supabase local real)', () => {
         message: 'Credenciales invalidas',
         statusCode: 401
       });
+    });
+
+    it('lanza error con statusCode 403 si el usuario esta bloqueado', async () => {
+      const user = await createRealUser({ role: 'student' });
+      await supabaseAdmin.from('profiles').update({ blocked_reason: 'Fraude', blocked_until: null }).eq('id', user.id);
+
+      await expect(loginUser({ email: user.email, password: user.password })).rejects.toMatchObject({
+        statusCode: 403
+      });
+    });
+
+    it('permite el login si la suspension temporal ya vencio', async () => {
+      const user = await createRealUser({ role: 'student' });
+      const ayer = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await supabaseAdmin.from('profiles').update({ blocked_reason: 'Vencida', blocked_until: ayer }).eq('id', user.id);
+
+      const result = await loginUser({ email: user.email, password: user.password });
+
+      expect(result.token).toEqual(expect.any(String));
     });
   });
 

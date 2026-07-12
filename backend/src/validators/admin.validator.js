@@ -12,6 +12,10 @@ export const blockUserSchema = z.object({
   dias: z.coerce.number().int().positive().optional()
 });
 
+export const deleteUserSchema = z.object({
+  motivo: z.string().min(1, 'El motivo es obligatorio')
+});
+
 export const housingStatusSchema = z.object({
   estado: z.enum(['approved', 'flagged', 'suspended'], {
     errorMap: () => ({ message: "estado debe ser 'approved', 'flagged' o 'suspended'" })

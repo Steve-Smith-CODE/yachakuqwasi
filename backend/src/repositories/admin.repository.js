@@ -22,13 +22,17 @@ export function findPendingDocuments() {
     .eq('status', 'pending');
 }
 
-export function updateDocumentStatus(docId, { status, comment }) {
+// Revisa TODOS los documentos pendientes de un usuario (DNI + carnet) en un
+// solo update, para que el admin apruebe/rechace la solicitud completa de
+// una vez en vez de documento por documento - evita que se verifique al
+// usuario habiendo aprobado solo uno de los dos.
+export function updateDocumentsStatusForUser(userId, { status, comment }) {
   return supabaseAdmin
     .from('verification_documents')
     .update({ status, comment, reviewed_at: new Date().toISOString() })
-    .eq('id', docId)
-    .select()
-    .single();
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .select();
 }
 
 export function updateProfileVerification(userId, fields) {
@@ -38,7 +42,7 @@ export function updateProfileVerification(userId, fields) {
 export function findPendingHousings() {
   return supabaseAdmin
     .from('housing_listings')
-    .select('*, profiles!housing_listings_landlord_id_fkey(name, phone)')
+    .select('*, profiles!housing_listings_landlord_id_fkey(name, phone, avatar_url)')
     .eq('status', 'pending');
 }
 
@@ -56,7 +60,7 @@ export function updateProfileBlock(userId, { blockedUntil, motivo }) {
 export function findAllHousingsAdmin() {
   return supabaseAdmin
     .from('housing_listings')
-    .select('*, profiles!housing_listings_landlord_id_fkey(name, phone)')
+    .select('*, profiles!housing_listings_landlord_id_fkey(name, phone, avatar_url)')
     .order('created_at', { ascending: false });
 }
 
@@ -76,11 +80,12 @@ export function insertAuditLog({ userId, actorName, action, details, type, listi
     .single();
 }
 
-export function findAuditLogs({ types, listingId } = {}) {
+export function findAuditLogs({ types, listingId, userId } = {}) {
   let query = supabaseAdmin.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(100);
 
   if (types?.length) query = query.in('type', types);
   if (listingId) query = query.eq('listing_id', listingId);
+  if (userId) query = query.eq('user_id', userId);
 
   return query;
 }
