@@ -4,22 +4,19 @@ import { DEMO_ACCOUNTS } from './demo-credentials.js';
 import { REAL_LISTINGS } from './real-listings-data.js';
 
 async function seed() {
-  console.log('Iniciando seed con las 10 publicaciones reales de Ayacucho (fotos e info de Airbnb)...');
+  console.log(`Iniciando seed con las ${REAL_LISTINGS.length} publicaciones reales de Ayacucho (fotos e info de Airbnb)...`);
 
   await createUser({ ...DEMO_ACCOUNTS.admin, role: 'admin', name: 'Admin YachakuqWasi' });
   console.log('Administrador creado.');
 
-  const landlords = [];
+  // Un unico arrendador demo es dueño de las 14 publicaciones reales (cada una
+  // conserva su narrativa/anfitrion original en la descripcion, pero la cuenta
+  // que las administra es siempre la misma: DEMO_ACCOUNTS.landlord).
+  const landlord = await createUser({ ...DEMO_ACCOUNTS.landlord, role: 'landlord', name: 'Arrendador Demo' });
+  console.log('Arrendador demo creado.');
+
   const allListings = [];
   for (const item of REAL_LISTINGS) {
-    const landlord = await createUser({
-      email: item.email,
-      password: 'Demo1234!',
-      role: 'landlord',
-      name: item.hostFirstName
-    });
-    landlords.push(landlord);
-
     const images = await uploadRealListingImages(item.slug, item.folder);
     // priceStayPen es la tarifa turistica total por stayNights noches (Airbnb),
     // no un alquiler mensual: se convierte a precio mensual estimado.
@@ -40,27 +37,14 @@ async function seed() {
     allListings.push(listing);
     console.log(`Publicación creada: "${listing.title}" (${item.hostFirstName}), S/${pricePenMonthly}/mes, ${images.length} fotos.`);
   }
-  console.log(`${landlords.length} arrendadores y ${allListings.length} publicaciones reales creadas (aprobadas).`);
+  console.log(`${allListings.length} publicaciones reales creadas (aprobadas) bajo el arrendador demo.`);
 
-  const students = [];
-  students.push(await createUser({ ...DEMO_ACCOUNTS.student, role: 'student', name: 'Estudiante Demo' }));
-  for (let i = 2; i <= 5; i++) {
-    students.push(
-      await createUser({
-        email: `estudiante${i}@yachakuqwasi.pe`,
-        password: 'Demo1234!',
-        role: 'student',
-        name: `Estudiante Demo ${i}`
-      })
-    );
-  }
-  console.log(`${students.length} estudiantes creados.`);
+  const student = await createUser({ ...DEMO_ACCOUNTS.student, role: 'student', name: 'Estudiante Demo' });
+  console.log('Estudiante demo creado.');
 
-  for (const student of students) {
-    const favListings = pickRandom(allListings, Math.min(3, allListings.length));
-    for (const listing of favListings) {
-      await addFavorite(student.id, listing.id);
-    }
+  const favListings = pickRandom(allListings, Math.min(3, allListings.length));
+  for (const listing of favListings) {
+    await addFavorite(student.id, listing.id);
   }
   console.log('Favoritos asignados.');
 

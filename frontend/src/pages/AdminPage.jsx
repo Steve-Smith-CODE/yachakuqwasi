@@ -1,7 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { ShieldCheck, Home, Users, Compass, CheckCircle2, ClipboardList, Heart, ArrowUpDown } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import {
+  ShieldCheck,
+  Home,
+  Users,
+  Compass,
+  CheckCircle2,
+  ClipboardList,
+  Heart,
+  ArrowUpDown,
+  AlertTriangle,
+  RotateCw,
+  Inbox
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
+import { buildRegistrationTrend, periodTrend } from "../utils/adminStats.js";
+import AdminInsightsCharts from "../components/AdminInsightsCharts.jsx";
 import {
   getStatsRequest,
   getPendingHousingsRequest,
@@ -54,7 +69,13 @@ const ROLE_META = {
 
 function AuditLogList({ logs, onOpenListing, emptyLabel }) {
   if (logs.length === 0) {
-    return <p className="text-xs text-slate-400">{emptyLabel}</p>;
+    return (
+      <div className="border border-dashed border-slate-200 rounded-2xl p-10 text-center space-y-1.5">
+        <Inbox className="h-8 w-8 text-slate-300 mx-auto" />
+        <p className="text-xs font-bold text-slate-500">{emptyLabel}</p>
+        <p className="text-[11px] text-slate-400">Los eventos aparecerán aquí automáticamente.</p>
+      </div>
+    );
   }
 
   return (
@@ -180,6 +201,7 @@ export default function AdminPage() {
   const { token } = useAuth();
   const location = useLocation();
   const consumedNavState = useRef(false);
+  const reduceMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState("verifications");
 
   const [stats, setStats] = useState(null);
@@ -312,7 +334,30 @@ export default function AdminPage() {
     loadAll();
   }
 
-  if (loading) return <div className="max-w-7xl mx-auto px-4 py-8 text-sm text-slate-400">Cargando panel...</div>;
+  const registrationTrend = useMemo(
+    () => buildRegistrationTrend(allUsers, allHousings),
+    [allUsers, allHousings]
+  );
+  const housingTrend = useMemo(() => periodTrend(allHousings, 7), [allHousings]);
+  const usersTrend = useMemo(() => periodTrend(allUsers, 7), [allUsers]);
+
+  if (loading) {
+    return (
+      <div
+        className="max-w-7xl mx-auto px-4 py-8 space-y-8"
+        role="status"
+        aria-label="Cargando panel de administración"
+      >
+        <div className="h-8 w-64 bg-slate-200 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-slate-100 rounded-3xl border border-slate-200 animate-pulse" />
+          ))}
+        </div>
+        <div className="h-56 bg-slate-100 rounded-3xl border border-slate-200 animate-pulse" />
+      </div>
+    );
+  }
 
   const pendingHousingsCount = allHousings.filter((h) => h.status === "pending").length;
 
@@ -338,30 +383,70 @@ export default function AdminPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       <h1 className="text-2xl font-black text-slate-900 tracking-tight">Panel de Administración</h1>
-      {error && <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-3 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+          <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
+          <p className="text-sm text-red-700 flex-1">{error}</p>
+          <button
+            onClick={loadAll}
+            className="inline-flex items-center gap-1.5 text-xs font-black text-red-700 bg-white hover:bg-red-100 border border-red-200 px-3 py-2 rounded-xl cursor-pointer shrink-0"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Credenciales Pendientes" className="bg-slate-900 border-slate-800">
-            <span className="text-3xl font-black mt-1 block font-mono text-amber-400">{pendingDocs.length}</span>
-          </StatCard>
+        <motion.div
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+          initial="hidden"
+          animate="visible"
+          variants={{ visible: { transition: { staggerChildren: reduceMotion ? 0 : 0.06 } } }}
+        >
+          {[
+            <StatCard key="docs" label="Credenciales Pendientes" className="bg-slate-900 border-slate-800">
+              <span className="text-3xl font-black mt-1 block font-mono text-amber-400">{pendingDocs.length}</span>
+            </StatCard>,
+            <StatCard
+              key="housings"
+              label="Total Ofertas de Vivienda"
+              value={allHousings.length}
+              trend={housingTrend}
+              hint={`✓ ${allHousings.filter((l) => l.status === "approved").length} activos públicamente`}
+            />,
+            <StatCard
+              key="users"
+              label="Cuentas Registradas"
+              value={allUsers.length}
+              trend={usersTrend}
+              hint={`Estudiantes: ${allUsers.filter((u) => u.role === "student").length} | Dueños: ${allUsers.filter((u) => u.role === "landlord").length}`}
+            />,
+            <StatCard key="events" label="Eventos Recientes" className="bg-[#FFFDF9] border-[#F0ECE3]">
+              <span className="text-3xl font-black mt-1 block font-mono text-guindo">{adminLogs.length + landlordLogs.length}</span>
+            </StatCard>
+          ].map((card) => (
+            <motion.div
+              key={card.key}
+              variants={{
+                hidden: reduceMotion ? {} : { opacity: 0, y: 12 },
+                visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } }
+              }}
+            >
+              {card}
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
 
-          <StatCard
-            label="Total Ofertas de Vivienda"
-            value={allHousings.length}
-            hint={`✓ ${allHousings.filter((l) => l.status === "approved").length} activos públicamente`}
-          />
-
-          <StatCard
-            label="Cuentas Registradas"
-            value={allUsers.length}
-            hint={`Estudiantes: ${allUsers.filter((u) => u.role === "student").length} | Dueños: ${allUsers.filter((u) => u.role === "landlord").length}`}
-          />
-
-          <StatCard label="Eventos Recientes" className="bg-[#FFFDF9] border-[#F0ECE3]">
-            <span className="text-3xl font-black mt-1 block font-mono text-guindo">{adminLogs.length + landlordLogs.length}</span>
-          </StatCard>
-        </div>
+      {stats && (
+        <motion.div
+          initial={reduceMotion ? undefined : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: reduceMotion ? 0 : 0.15 }}
+        >
+          <AdminInsightsCharts registrationTrend={registrationTrend} housingByStatus={housingByStatus} />
+        </motion.div>
       )}
 
       {stats && (
@@ -388,7 +473,7 @@ export default function AdminPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`min-h-11 px-3.5 py-2.5 rounded-xl text-xs font-black transition-colors duration-200 cursor-pointer flex items-center gap-1.5 ${
                   activeTab === tab.id ? "bg-guindo text-white shadow-sm" : "text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -675,7 +760,9 @@ export default function AdminPage() {
             <div className="space-y-4">
               <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                 <span>Actividad de Arrendadores</span>
-                <Heart className="h-3.5 w-3.5 text-rose-500" />
+                <span title="Incluye los favoritos marcados por estudiantes">
+                  <Heart className="h-3.5 w-3.5 text-rose-500" />
+                </span>
               </h4>
               <p className="text-[11px] text-slate-400 -mt-2">
                 Lo que cada arrendador hace sobre sus propios anuncios (pausar, publicar, editar, eliminar) y los favoritos que marcan los estudiantes.
