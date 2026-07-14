@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Plus, ImagePlus, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { createHousingRequest, uploadHousingImagesRequest } from "../api/housings.js";
@@ -24,6 +25,7 @@ const initialForm = {
 export default function PublishPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [form, setForm] = useState(initialForm);
   const [amenityInput, setAmenityInput] = useState("");
   const [photos, setPhotos] = useState([]);
@@ -101,10 +103,30 @@ export default function PublishPage() {
           </p>
         </div>
 
-        {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4">{error}</p>}
+        <AnimatePresence>
+          {error && (
+            <motion.p
+              initial={reduceMotion ? undefined : { opacity: 0, height: 0, y: -6 }}
+              animate={{ opacity: 1, height: "auto", y: 0 }}
+              exit={reduceMotion ? undefined : { opacity: 0, height: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4 overflow-hidden"
+            >
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
+        <AnimatePresence>
         {success ? (
-          <div className="py-8 text-center space-y-3">
+          <motion.div
+            key="success"
+            initial={reduceMotion ? undefined : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -10 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="py-8 text-center space-y-3"
+          >
             <div className="h-12 w-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle2 className="h-6 w-6" />
             </div>
@@ -127,9 +149,17 @@ export default function PublishPage() {
                 Publicar otra habitación
               </button>
             </div>
-          </div>
+          </motion.div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <motion.form
+            key="form"
+            onSubmit={handleSubmit}
+            initial={reduceMotion ? undefined : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0, y: -10 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-4"
+          >
             <div className="space-y-1 text-left">
               <label className="text-[10px] font-black tracking-wider text-slate-500 uppercase block">Título del Anuncio</label>
               <input
@@ -245,18 +275,28 @@ export default function PublishPage() {
                 </button>
               </div>
               <div className="flex flex-wrap gap-1 mt-1.5">
-                {form.amenities.map((item, i) => (
-                  <span key={i} className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded-lg flex items-center gap-1 font-semibold">
-                    <span>{item}</span>
-                    <button
-                      type="button"
-                      onClick={() => set("amenities", form.amenities.filter((_, idx) => idx !== i))}
-                      className="text-red-500 hover:text-red-700 font-bold font-mono cursor-pointer"
+                <AnimatePresence>
+                  {form.amenities.map((item, i) => (
+                    <motion.span
+                      key={item}
+                      layout={!reduceMotion}
+                      initial={reduceMotion ? undefined : { opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={reduceMotion ? undefined : { opacity: 0, scale: 0.8 }}
+                      transition={{ duration: 0.15 }}
+                      className="bg-slate-100 text-slate-700 text-[10px] px-2 py-0.5 rounded-lg flex items-center gap-1 font-semibold"
                     >
-                      ×
-                    </button>
-                  </span>
-                ))}
+                      <span>{item}</span>
+                      <button
+                        type="button"
+                        onClick={() => set("amenities", form.amenities.filter((_, idx) => idx !== i))}
+                        className="text-red-500 hover:text-red-700 font-bold font-mono cursor-pointer"
+                      >
+                        ×
+                      </button>
+                    </motion.span>
+                  ))}
+                </AnimatePresence>
               </div>
             </div>
 
@@ -294,18 +334,28 @@ export default function PublishPage() {
 
               {photos.length > 0 && (
                 <div className="grid grid-cols-4 gap-2 mt-2">
-                  {photos.map((p, i) => (
-                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group">
-                      <img src={p.previewUrl} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(i)}
-                        className="absolute top-0.5 right-0.5 bg-slate-900/70 text-white rounded-full h-4 w-4 flex items-center justify-center text-[10px] leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  <AnimatePresence>
+                    {photos.map((p, i) => (
+                      <motion.div
+                        key={p.previewUrl}
+                        layout={!reduceMotion}
+                        initial={reduceMotion ? undefined : { opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={reduceMotion ? undefined : { opacity: 0, scale: 0.85 }}
+                        transition={{ duration: 0.18 }}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 group"
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        <img src={p.previewUrl} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(i)}
+                          className="absolute top-0.5 right-0.5 bg-slate-900/70 text-white rounded-full h-4 w-4 flex items-center justify-center text-[10px] leading-none font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                        >
+                          ×
+                        </button>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
                 </div>
               )}
             </div>
@@ -325,8 +375,9 @@ export default function PublishPage() {
             >
               Cancelar
             </button>
-          </form>
+          </motion.form>
         )}
+        </AnimatePresence>
       </div>
     </div>
   );

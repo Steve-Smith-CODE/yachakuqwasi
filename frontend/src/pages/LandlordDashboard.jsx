@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Home, ShieldCheck, Send, Plus, Clock, Layers, Heart, Users } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -33,9 +34,13 @@ const DELETE_REASON_LABEL = {
   other: "Otro motivo"
 };
 
+const staggerParent = { hidden: {}, visible: { transition: { staggerChildren: 0.06 } } };
+const fadeUp = { hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } } };
+
 export default function LandlordDashboard() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewingStudentId, setViewingStudentId] = useState(null);
@@ -156,76 +161,93 @@ export default function LandlordDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard
-          icon={Home}
-          label="Mis Anuncios Activos"
-          value={stats ? stats.listingsByStatus.approved || 0 : approvedListings.length}
-          hint={`${stats ? stats.listingsByStatus.pending || 0 : listings.filter((l) => l.status === "pending").length} en cola de aprobación`}
-        />
-        <StatCard icon={Layers} label="Total de Anuncios" value={stats ? stats.totalListings : listings.length} />
-        <StatCard
-          label="Recaudación Estimada"
-          value={`S/. ${totalEarnings}`}
-          hint="Suma mensual de anuncios activos"
-          tone="guindo"
-        />
-        <StatCard icon={Heart} label="Favoritos Recibidos" value={stats?.favoritesReceived ?? "—"} tone="guindo" />
-        <StatCard icon={Users} label="Contactos Recibidos" value={stats?.contactsReceived ?? "—"} tone="guindo" />
+      <motion.div
+        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4"
+        initial={reduceMotion ? undefined : "hidden"}
+        animate="visible"
+        variants={staggerParent}
+      >
+        <motion.div variants={fadeUp}>
+          <StatCard
+            icon={Home}
+            label="Mis Anuncios Activos"
+            value={stats ? stats.listingsByStatus.approved || 0 : approvedListings.length}
+            hint={`${stats ? stats.listingsByStatus.pending || 0 : listings.filter((l) => l.status === "pending").length} en cola de aprobación`}
+          />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard icon={Layers} label="Total de Anuncios" value={stats ? stats.totalListings : listings.length} />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard
+            label="Recaudación Estimada"
+            value={`S/. ${totalEarnings}`}
+            hint="Suma mensual de anuncios activos"
+            tone="guindo"
+          />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard icon={Heart} label="Favoritos Recibidos" value={stats?.favoritesReceived ?? "—"} tone="guindo" />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard icon={Users} label="Contactos Recibidos" value={stats?.contactsReceived ?? "—"} tone="guindo" />
+        </motion.div>
 
-        <StatCard label="Verificación">
-          {isApproved ? (
-            <span className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-1 flex items-center gap-1">
-              <ShieldCheck className="h-4.5 w-4.5 text-emerald-500 shrink-0" /> <span>Verificado</span>
-            </span>
-          ) : verificationStatus === "pending" ? (
-            <span className="text-xs font-black text-sky-600 uppercase tracking-widest mt-1 flex items-center gap-1">
-              <Clock className="h-4 w-4 animate-spin" /> <span>En revisión</span>
-            </span>
-          ) : (
-            <div className="mt-1 space-y-1">
-              <div className="flex gap-1">
-                <label
-                  className={`flex-1 text-center text-[9px] font-black px-1.5 py-1 rounded-lg cursor-pointer border transition-colors ${
-                    dniFile ? "border-emerald-400 text-emerald-600 bg-emerald-50" : "border-guindo/30 text-guindo hover:bg-guindo/5"
-                  }`}
+        <motion.div variants={fadeUp}>
+          <StatCard label="Verificación">
+            {isApproved ? (
+              <span className="text-xs font-black text-emerald-600 uppercase tracking-widest mt-1 flex items-center gap-1">
+                <ShieldCheck className="h-4.5 w-4.5 text-emerald-500 shrink-0" /> <span>Verificado</span>
+              </span>
+            ) : verificationStatus === "pending" ? (
+              <span className="text-xs font-black text-sky-600 uppercase tracking-widest mt-1 flex items-center gap-1">
+                <Clock className="h-4 w-4 animate-spin" /> <span>En revisión</span>
+              </span>
+            ) : (
+              <div className="mt-1 space-y-1">
+                <div className="flex gap-1">
+                  <label
+                    className={`flex-1 text-center text-[9px] font-black px-1.5 py-1 rounded-lg cursor-pointer border transition-colors ${
+                      dniFile ? "border-emerald-400 text-emerald-600 bg-emerald-50" : "border-guindo/30 text-guindo hover:bg-guindo/5"
+                    }`}
+                  >
+                    {dniFile ? "DNI ✓" : "DNI"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => setDniFile(e.target.files?.[0] || null)}
+                      disabled={uploading}
+                    />
+                  </label>
+                  <label
+                    className={`flex-1 text-center text-[9px] font-black px-1.5 py-1 rounded-lg cursor-pointer border transition-colors ${
+                      carnetFile ? "border-emerald-400 text-emerald-600 bg-emerald-50" : "border-guindo/30 text-guindo hover:bg-guindo/5"
+                    }`}
+                  >
+                    {carnetFile ? "Título ✓" : "Título"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => setCarnetFile(e.target.files?.[0] || null)}
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSubmitVerification}
+                  disabled={!dniFile || !carnetFile || uploading}
+                  className="w-full text-[9px] font-black text-white bg-guindo py-1 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:bg-guindo-dark transition-all"
                 >
-                  {dniFile ? "DNI ✓" : "DNI"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => setDniFile(e.target.files?.[0] || null)}
-                    disabled={uploading}
-                  />
-                </label>
-                <label
-                  className={`flex-1 text-center text-[9px] font-black px-1.5 py-1 rounded-lg cursor-pointer border transition-colors ${
-                    carnetFile ? "border-emerald-400 text-emerald-600 bg-emerald-50" : "border-guindo/30 text-guindo hover:bg-guindo/5"
-                  }`}
-                >
-                  {carnetFile ? "Título ✓" : "Título"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => setCarnetFile(e.target.files?.[0] || null)}
-                    disabled={uploading}
-                  />
-                </label>
+                  {uploading ? "Enviando..." : "Enviar"}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleSubmitVerification}
-                disabled={!dniFile || !carnetFile || uploading}
-                className="w-full text-[9px] font-black text-white bg-guindo py-1 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer hover:bg-guindo-dark transition-all"
-              >
-                {uploading ? "Enviando..." : "Enviar"}
-              </button>
-            </div>
-          )}
-        </StatCard>
-      </div>
+            )}
+          </StatCard>
+        </motion.div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
@@ -253,12 +275,26 @@ export default function LandlordDashboard() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              initial={reduceMotion ? undefined : "hidden"}
+              animate="visible"
+              variants={staggerParent}
+            >
+              <AnimatePresence>
               {listings.map((room) => {
                 const status = STATUS_LABEL[room.status] || STATUS_LABEL.pending;
                 const isPaused = Boolean(room.paused_at);
                 return (
-                  <div key={room.id} className="border border-slate-200 rounded-2xl p-4 space-y-3 text-left bg-slate-50/20">
+                  <motion.div
+                    key={room.id}
+                    layout={!reduceMotion}
+                    variants={fadeUp}
+                    initial="hidden"
+                    animate="visible"
+                    exit={reduceMotion ? undefined : { opacity: 0, scale: 0.96, transition: { duration: 0.18 } }}
+                    className="border border-slate-200 rounded-2xl p-4 space-y-3 text-left bg-slate-50/20"
+                  >
                     <div className="h-28 rounded-xl overflow-hidden bg-slate-100 relative">
                       <img
                         src={room.images?.[0] || getPlaceholderImage(room.type, room.id)}
@@ -288,10 +324,11 @@ export default function LandlordDashboard() {
                       <span className="font-black text-guindo font-mono">S/. {room.price_pen}</span>
                     </div>
                     <ListingHistoryPanel listingId={room.id} token={token} />
-                  </div>
+                  </motion.div>
                 );
               })}
-            </div>
+              </AnimatePresence>
+            </motion.div>
           )}
         </div>
 

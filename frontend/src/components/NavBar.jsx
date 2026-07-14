@@ -1,4 +1,5 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { motion, useReducedMotion } from "motion/react";
 import { LogOut, MessageCircle, Plus, Search, Award, Clock, Volume2, VolumeX, LogIn } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import NotificationBell from "./NotificationBell.jsx";
@@ -11,6 +12,7 @@ export default function NavBar({ onOpenMaki, soundOn, onToggleSound }) {
   const { user, isAuthenticated, logout, openAuthModal } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const reduceMotion = useReducedMotion();
 
   function handleLogout() {
     logout();
@@ -103,24 +105,36 @@ export default function NavBar({ onOpenMaki, soundOn, onToggleSound }) {
           <div className="flex gap-1">
             <Link
               to="/explorar"
-              className={`px-4 py-3.5 text-xs font-black uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                location.pathname === "/explorar"
-                  ? "border-guindo text-guindo"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+              className={`relative px-4 py-3.5 text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer ${
+                location.pathname === "/explorar" ? "text-guindo" : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <Search className="h-4 w-4" />
               <span>Explorar Habitaciones</span>
+              {location.pathname === "/explorar" && (
+                <motion.span
+                  layoutId={reduceMotion ? undefined : "navTabIndicator"}
+                  className="absolute inset-x-0 bottom-0 h-0.5 bg-guindo"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              )}
             </Link>
             {isAuthenticated && (
               <Link
                 to={dashboardPath}
-                className={`px-4 py-3.5 text-xs font-black uppercase tracking-wider flex items-center gap-2 border-b-2 transition-all cursor-pointer ${
-                  onDashboard ? "border-guindo text-guindo" : "border-transparent text-slate-500 hover:text-slate-800"
+                className={`relative px-4 py-3.5 text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer ${
+                  onDashboard ? "text-guindo" : "text-slate-500 hover:text-slate-800"
                 }`}
               >
                 <Award className="h-4 w-4" />
                 <span>Mi Portal UNSCH</span>
+                {onDashboard && (
+                  <motion.span
+                    layoutId={reduceMotion ? undefined : "navTabIndicator"}
+                    className="absolute inset-x-0 bottom-0 h-0.5 bg-guindo"
+                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                  />
+                )}
               </Link>
             )}
           </div>

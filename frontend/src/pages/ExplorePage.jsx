@@ -484,10 +484,14 @@ export default function ExplorePage() {
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#FDFBF7] to-transparent pointer-events-none z-10" />
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#FDFBF7] to-transparent pointer-events-none z-10" />
 
-            <div
+            <motion.div
               ref={scrollContainerRef}
               onScroll={handleScroll}
               className="flex gap-6 overflow-x-auto pb-6 pt-2 px-1 snap-x snap-mandatory scroll-smooth scrollbar-none"
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.15 }}
+              variants={staggerParent}
             >
               {!loading && visibleListings.length === 0 ? (
                 <div className="w-full bg-white rounded-3xl border border-dashed border-guindo/20 p-12 text-center space-y-4">
@@ -502,16 +506,17 @@ export default function ExplorePage() {
                 </div>
               ) : (
                 visibleListings.map((room) => (
-                  <HousingCard
-                    key={room.id}
-                    listing={room}
-                    onOpen={handleOpenListing}
-                    isFavorite={favoriteIds.has(room.id)}
-                    onToggleFavorite={handleToggleFavorite}
-                  />
+                  <motion.div key={room.id} variants={fadeUp} className="shrink-0">
+                    <HousingCard
+                      listing={room}
+                      onOpen={handleOpenListing}
+                      isFavorite={favoriteIds.has(room.id)}
+                      onToggleFavorite={handleToggleFavorite}
+                    />
+                  </motion.div>
                 ))
               )}
-            </div>
+            </motion.div>
           </div>
 
           <p className="text-center text-[11px] text-slate-400 font-medium">

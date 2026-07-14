@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "motion/react";
 import { MessageCircle, ShieldCheck, Clock, Lock, Heart, Calculator, Plus, Send } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { listChatsRequest, getMessagesRequest, sendMessageRequest } from "../api/chat.js";
@@ -13,9 +14,13 @@ import UserProfileModal from "../components/UserProfileModal.jsx";
 import unschLogoIcon from "../assets/images/maqueta-unsch.webp";
 import makiMascot from "../assets/images/maki-mascota.webp";
 
+const staggerParent = { hidden: {}, visible: { transition: { staggerChildren: 0.06 } } };
+const fadeUp = { hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } } };
+
 export default function StudentDashboard() {
   const { token, user } = useAuth();
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [viewingLandlordId, setViewingLandlordId] = useState(null);
 
   const [chats, setChats] = useState([]);
@@ -96,10 +101,19 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard icon={Heart} label="Favoritos Guardados" value={stats?.savedFavorites ?? favorites.length} tone="guindo" />
-        <StatCard icon={MessageCircle} label="Chats Activos" value={stats?.activeChats ?? chats.length} tone="guindo" />
-      </div>
+      <motion.div
+        className="grid grid-cols-2 gap-4"
+        initial={reduceMotion ? undefined : "hidden"}
+        animate="visible"
+        variants={staggerParent}
+      >
+        <motion.div variants={fadeUp}>
+          <StatCard icon={Heart} label="Favoritos Guardados" value={stats?.savedFavorites ?? favorites.length} tone="guindo" />
+        </motion.div>
+        <motion.div variants={fadeUp}>
+          <StatCard icon={MessageCircle} label="Chats Activos" value={stats?.activeChats ?? chats.length} tone="guindo" />
+        </motion.div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
       <div className="lg:col-span-4 space-y-6">
@@ -204,9 +218,11 @@ export default function StudentDashboard() {
                 Aún no tienes chats activos. Escríbele a un arrendador desde una publicación en Explorar.
               </div>
             ) : (
-              chats.map((chat) => (
-                <div
+              <motion.div initial={reduceMotion ? undefined : "hidden"} animate="visible" variants={staggerParent}>
+              {chats.map((chat) => (
+                <motion.div
                   key={chat.id}
+                  variants={fadeUp}
                   onClick={() => setActiveChatId(chat.id)}
                   className={`w-full text-left p-3.5 flex gap-2.5 items-start transition-colors cursor-pointer ${
                     activeChatId === chat.id ? "bg-guindo/5 border-l-4 border-guindo" : "hover:bg-slate-50"
@@ -230,8 +246,9 @@ export default function StudentDashboard() {
                     <h5 className="text-xs font-extrabold text-slate-800 truncate">{chat.housing_listings?.title || "Alojamiento"}</h5>
                     <p className="text-[10px] text-slate-500 truncate italic">"{chat.last_message || "Sin mensajes aún"}"</p>
                   </div>
-                </div>
-              ))
+                </motion.div>
+              ))}
+              </motion.div>
             )}
           </div>
         </div>
@@ -301,9 +318,14 @@ export default function StudentDashboard() {
               Aún no has guardado ninguna habitación. Marca con ❤️ tus opciones preferidas en Explorar.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3.5">
+            <motion.div
+              className="grid grid-cols-1 gap-3.5"
+              initial={reduceMotion ? undefined : "hidden"}
+              animate="visible"
+              variants={staggerParent}
+            >
               {favorites.map((room) => (
-                <div key={room.id} className="border border-slate-100 rounded-2xl p-3 flex gap-3 items-center bg-slate-50/50">
+                <motion.div key={room.id} variants={fadeUp} className="border border-slate-100 rounded-2xl p-3 flex gap-3 items-center bg-slate-50/50">
                   <div className="h-14 w-14 rounded-xl overflow-hidden bg-slate-100 shrink-0">
                     <img
                       src={room.images?.[0] || getPlaceholderImage(room.type, room.id)}
@@ -315,9 +337,9 @@ export default function StudentDashboard() {
                     <h5 className="text-xs font-extrabold text-slate-800 truncate">{room.title}</h5>
                     <span className="text-[11px] font-black text-guindo font-mono">S/. {room.price_pen} PEN / mes</span>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
