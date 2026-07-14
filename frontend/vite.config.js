@@ -32,6 +32,17 @@ export default defineConfig({
     // en backend/); se excluye del `vitest run` normal (y por lo tanto de CI)
     // porque necesita ese servidor levantado. Se corre aparte con
     // `npm run local:test:frontend-real` desde la raiz del repo.
-    exclude: [...configDefaults.exclude, '**/*.real.test.jsx']
+    exclude: [...configDefaults.exclude, '**/*.real.test.jsx'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      include: ['src/**/*.{js,jsx}'],
+      exclude: [
+        'src/main.jsx',
+        'src/test/**',
+        'src/assets/**',
+        '**/*.test.{js,jsx}'
+      ]
+    }
   }
 })
