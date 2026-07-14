@@ -10,62 +10,48 @@ beforeEach(() => {
 });
 
 describe("PhoneContactPopover", () => {
-  it("muestra el boton Llamar y el popover cerrado inicialmente", () => {
+  it("muestra el numero directamente, sin necesitar ningun clic", () => {
     render(<PhoneContactPopover phone="966123456" />);
 
-    expect(screen.getAllByText("Llamar")[0]).toBeInTheDocument();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-
-  it("al hacer click abre el popover con el numero", () => {
-    render(<PhoneContactPopover phone="966123456" />);
-
-    fireEvent.click(screen.getByRole("button", { name: /llamar/i }));
-
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("966123456")).toBeInTheDocument();
+    expect(screen.queryByText("Llamar")).not.toBeInTheDocument();
   });
 
-  it("el link tel: tiene el numero correcto", () => {
+  it("el numero es un link tel: con el numero correcto", () => {
     render(<PhoneContactPopover phone="966123456" />);
-    fireEvent.click(screen.getByRole("button", { name: /llamar/i }));
 
-    const telLink = screen.getByRole("dialog").querySelector("a[href^='tel:']");
+    const telLink = screen.getByText("966123456").closest("a");
     expect(telLink.getAttribute("href")).toBe("tel:966123456");
   });
 
   it("copiar llama a navigator.clipboard.writeText y muestra Copiado", async () => {
     render(<PhoneContactPopover phone="966123456" />);
-    fireEvent.click(screen.getByRole("button", { name: /llamar/i }));
 
-    fireEvent.click(screen.getByRole("button", { name: /copiar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copiar número/i }));
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith("966123456");
     expect(await screen.findByText("Copiado")).toBeInTheDocument();
   });
 
-  it("Escape cierra el popover", () => {
+  it("el aviso de Copiado desaparece despues de un tiempo", async () => {
     render(<PhoneContactPopover phone="966123456" />);
-    fireEvent.click(screen.getByRole("button", { name: /llamar/i }));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
 
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: /copiar número/i }));
+    expect(await screen.findByText("Copiado")).toBeInTheDocument();
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Copiado")).not.toBeInTheDocument(), { timeout: 2500 });
   });
 
-  it("un click afuera cierra el popover", () => {
+  it("el click no se propaga a un contenedor clicable (ej. la card completa)", () => {
+    const onCardClick = vi.fn();
     render(
-      <div>
+      <div onClick={onCardClick}>
         <PhoneContactPopover phone="966123456" />
-        <button>Afuera</button>
       </div>
     );
-    fireEvent.click(screen.getByRole("button", { name: /llamar/i }));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
 
-    fireEvent.mouseDown(screen.getByText("Afuera"));
+    fireEvent.click(screen.getByRole("button", { name: /copiar número/i }));
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onCardClick).not.toHaveBeenCalled();
   });
 });

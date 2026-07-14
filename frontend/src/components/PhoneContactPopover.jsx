@@ -1,50 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Phone, Copy, Check } from "lucide-react";
 
 const SIZE = {
-  sm: {
-    trigger: "text-[11px] py-2 px-2.5 gap-1.5",
-    icon: "h-3 w-3",
-    panel: "w-[210px] p-3",
-    number: "text-sm",
-    action: "text-[10px] py-1.5"
-  },
-  md: {
-    trigger: "text-xs py-2.5 gap-1.5",
-    icon: "h-3.5 w-3.5",
-    panel: "w-[230px] p-3.5",
-    number: "text-base",
-    action: "text-[11px] py-2"
-  }
+  sm: { chip: "text-[11px] py-2 px-2.5 gap-1.5", icon: "h-3 w-3", copyBtn: "p-1.5" },
+  md: { chip: "text-xs py-2.5 px-3 gap-2", icon: "h-3.5 w-3.5", copyBtn: "p-2" }
 };
 
-// Popover de "Llamar": en desktop un `tel:` no hace nada visible, asi que en
-// vez de solo abrir el marcador, mostramos el numero para copiarlo. En movil
-// "Llamar" abre el marcador igual.
+// El numero se muestra directo (no hay un boton "Llamar" que abra un popover):
+// un tel: no hace nada visible en desktop, asi que esconder el numero detras
+// de un clic solo generaba la sensacion de un boton roto.
 export default function PhoneContactPopover({ phone, size = "sm", className = "" }) {
-  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const ref = useRef(null);
   const s = SIZE[size];
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handleClickOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    function handleKey(e) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [open]);
-
-  async function handleCopy() {
+  async function handleCopy(e) {
+    e.stopPropagation();
     try {
       await navigator.clipboard.writeText(phone);
       setCopied(true);
@@ -55,50 +26,37 @@ export default function PhoneContactPopover({ phone, size = "sm", className = ""
   }
 
   return (
-    <div ref={ref} className={`relative flex-1 ${className}`} onClick={(e) => e.stopPropagation()}>
+    <div
+      className={`relative flex-1 flex items-center justify-between bg-guindo/5 border border-guindo/20 text-guindo rounded-xl ${s.chip} ${className}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <a href={`tel:${phone}`} className="flex items-center gap-1.5 min-w-0 flex-1">
+        <Phone className={`${s.icon} shrink-0`} />
+        <span className="font-mono font-black tracking-wide tabular-nums truncate">{phone}</span>
+      </a>
+
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className={`w-full bg-guindo hover:bg-guindo-dark text-white font-black rounded-xl flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer text-center ${s.trigger}`}
+        onClick={handleCopy}
+        aria-label="Copiar número"
+        className={`shrink-0 rounded-lg text-guindo hover:bg-guindo/10 transition-all cursor-pointer active:scale-90 ${s.copyBtn}`}
       >
-        <Phone className={`${s.icon} text-dorado shrink-0`} />
-        <span>Llamar</span>
+        {copied ? <Check className={`${s.icon} text-emerald-600`} /> : <Copy className={s.icon} />}
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Número de contacto"
-          className={`absolute z-30 top-[calc(100%+8px)] left-0 bg-white border border-slate-200 rounded-2xl shadow-xl ${s.panel}`}
-        >
-          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
-            Número de contacto
-          </span>
-          <p className={`font-mono font-black text-slate-900 tracking-wide tabular-nums select-all mb-2.5 ${s.number}`}>
-            {phone}
-          </p>
-
-          <div className="flex gap-1.5">
-            <a
-              href={`tel:${phone}`}
-              onClick={() => setOpen(false)}
-              className={`flex-1 bg-guindo hover:bg-guindo-dark text-white font-black rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${s.action}`}
-            >
-              <Phone className="h-3 w-3 text-dorado" />
-              <span>Llamar</span>
-            </a>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className={`flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${s.action}`}
-            >
-              {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
-              <span>{copied ? "Copiado" : "Copiar"}</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {copied && (
+          <motion.span
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute -top-7 right-0 bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-lg"
+          >
+            Copiado
+          </motion.span>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
