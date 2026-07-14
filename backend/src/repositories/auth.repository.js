@@ -13,6 +13,10 @@ export function signInWithPassword({ email, password }) {
   return supabasePublic.auth.signInWithPassword({ email, password });
 }
 
+export function refreshSession(refreshToken) {
+  return supabasePublic.auth.refreshSession({ refresh_token: refreshToken });
+}
+
 export function findProfileById(id) {
   return supabaseAdmin.from('profiles').select('*').eq('id', id).single();
 }

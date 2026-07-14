@@ -1,4 +1,4 @@
-import { createAuthUser, signInWithPassword, findProfileById, requestPasswordReset } from '../repositories/auth.repository.js';
+import { createAuthUser, signInWithPassword, refreshSession, findProfileById, requestPasswordReset } from '../repositories/auth.repository.js';
 import { notifyAdminsOfNewUser } from './notifications.service.js';
 import { isProfileBlocked } from '../utils/blockStatus.js';
 import logger from '../config/logger.js';
@@ -50,7 +50,25 @@ export async function loginUser({ email, password }) {
 
   return {
     token: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    expiresAt: data.session.expires_at,
     user: { id: data.user.id, email: data.user.email, ...profile }
+  };
+}
+
+export async function refreshUserSession({ refreshToken }) {
+  const { data, error } = await refreshSession(refreshToken);
+
+  if (error || !data.session) {
+    const err = new Error('Sesion invalida o expirada');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  return {
+    token: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    expiresAt: data.session.expires_at
   };
 }
 

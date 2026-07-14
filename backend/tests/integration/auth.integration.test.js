@@ -34,6 +34,31 @@ describe('Auth Integration (Supabase local real)', () => {
     });
   });
 
+  describe('POST /api/auth/refresh', () => {
+    it('debe devolver un token nuevo a partir de un refresh token real', async () => {
+      const user = await createRealUser({ role: 'student' });
+      const loginRes = await request(app).post('/api/auth/login').send({ email: user.email, password: user.password });
+
+      const res = await request(app).post('/api/auth/refresh').send({ refreshToken: loginRes.body.refreshToken });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('token');
+      expect(res.body).toHaveProperty('refreshToken');
+    });
+
+    it('debe rechazar un refresh token invalido', async () => {
+      const res = await request(app).post('/api/auth/refresh').send({ refreshToken: 'token-basura-invalido' });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('debe rechazar la peticion si falta el refreshToken', async () => {
+      const res = await request(app).post('/api/auth/refresh').send({});
+
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('POST /api/auth/register', () => {
     it('debe registrar un nuevo estudiante real', async () => {
       const email = uniqueEmail('integration-register');

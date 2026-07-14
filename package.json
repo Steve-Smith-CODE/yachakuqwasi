@@ -9,7 +9,8 @@
     "local:build": "npm run build --prefix frontend",
     "local:test": "npm run test --prefix backend",
     "local:test:unit": "npm run test:unit --prefix backend",
-    "local:test:integration": "npm run test:integration --prefix backend"
+    "local:test:integration": "npm run test:integration --prefix backend",
+    "local:test:frontend-real": "node scripts/run-frontend-real-tests.js"
   },
   "devDependencies": {
     "concurrently": "^10.0.3"

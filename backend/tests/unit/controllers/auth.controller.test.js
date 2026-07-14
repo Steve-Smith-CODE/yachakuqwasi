@@ -1,4 +1,4 @@
-import { register, login, forgotPassword } from '../../../src/controllers/auth.controller.js';
+import { register, login, refresh, forgotPassword } from '../../../src/controllers/auth.controller.js';
 import { createRealUser, cleanupCreatedUsers, trackUserForCleanup, uniqueEmail } from '../../helpers/testData.js';
 
 afterAll(async () => {
@@ -53,6 +53,30 @@ describe('Auth Controller (Supabase local real)', () => {
       const body = res.json.mock.calls[0][0];
       expect(body.token).toEqual(expect.any(String));
       expect(body.user.name).toBe('Login Controller');
+    });
+  });
+
+  describe('refresh', () => {
+    it('responde 400 si falta el refreshToken', async () => {
+      req.body = {};
+
+      await refresh(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('refresca la sesion real y responde con un token nuevo', async () => {
+      const user = await createRealUser({ role: 'student' });
+      req.body = { email: user.email, password: user.password };
+      await login(req, res);
+      const { refreshToken } = res.json.mock.calls[0][0];
+
+      req.body = { refreshToken };
+      await refresh(req, res);
+
+      const body = res.json.mock.calls[1][0];
+      expect(body.token).toEqual(expect.any(String));
+      expect(body.refreshToken).toEqual(expect.any(String));
     });
   });
 

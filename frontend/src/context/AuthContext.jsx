@@ -1,7 +1,8 @@
-import { createContext, useContext, useState } from "react";
-import { loginRequest, registerRequest } from "../api/auth.js";
+import { createContext, useContext, useState, useEffect } from "react";
+import { loginRequest, registerRequest, refreshRequest } from "../api/auth.js";
 
 const STORAGE_KEY = "yachakuqwasi_auth";
+const REFRESH_MARGIN_MS = 60_000; // refrescar 1 min antes de que expire el access token
 const AuthContext = createContext(null);
 
 function loadStoredAuth() {
@@ -27,11 +28,43 @@ export function AuthProvider({ children }) {
 
   async function login(email, password) {
     const result = await loginRequest({ email, password });
-    const nextAuth = { token: result.token, user: result.user };
+    const nextAuth = {
+      token: result.token,
+      refreshToken: result.refreshToken,
+      expiresAt: result.expiresAt,
+      user: result.user
+    };
     setAuth(nextAuth);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAuth));
     return nextAuth;
   }
+
+  // Los access tokens de Supabase expiran a la hora; sin este refresco
+  // automático cualquier sesión abierta por más tiempo empieza a fallar
+  // con 401 "Token invalido o expirado" en todas las peticiones.
+  useEffect(() => {
+    if (!auth?.expiresAt || !auth?.refreshToken) return undefined;
+
+    const delay = Math.max(auth.expiresAt * 1000 - Date.now() - REFRESH_MARGIN_MS, 0);
+    const timer = setTimeout(async () => {
+      try {
+        const result = await refreshRequest(auth.refreshToken);
+        const nextAuth = {
+          ...auth,
+          token: result.token,
+          refreshToken: result.refreshToken,
+          expiresAt: result.expiresAt
+        };
+        setAuth(nextAuth);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAuth));
+      } catch {
+        setAuth(null);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [auth]);
 
   async function register(data) {
     return registerRequest(data);

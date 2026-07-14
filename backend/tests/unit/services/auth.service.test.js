@@ -1,4 +1,4 @@
-import { registerUser, loginUser, forgotPassword } from '../../../src/services/auth.service.js';
+import { registerUser, loginUser, refreshUserSession, forgotPassword } from '../../../src/services/auth.service.js';
 import * as authRepo from '../../../src/repositories/auth.repository.js';
 import * as notificationsService from '../../../src/services/notifications.service.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
@@ -75,6 +75,8 @@ describe('Auth Service (Supabase local real)', () => {
       const result = await loginUser({ email: user.email, password: user.password });
 
       expect(result.token).toEqual(expect.any(String));
+      expect(result.refreshToken).toEqual(expect.any(String));
+      expect(result.expiresAt).toEqual(expect.any(Number));
       expect(result.user).toMatchObject({
         id: user.id,
         email: user.email,
@@ -110,6 +112,26 @@ describe('Auth Service (Supabase local real)', () => {
       const result = await loginUser({ email: user.email, password: user.password });
 
       expect(result.token).toEqual(expect.any(String));
+    });
+  });
+
+  describe('refreshUserSession', () => {
+    it('devuelve un token nuevo a partir de un refresh token real', async () => {
+      const user = await createRealUser({ role: 'student' });
+      const { refreshToken } = await loginUser({ email: user.email, password: user.password });
+
+      const result = await refreshUserSession({ refreshToken });
+
+      expect(result.token).toEqual(expect.any(String));
+      expect(result.refreshToken).toEqual(expect.any(String));
+      expect(result.expiresAt).toEqual(expect.any(Number));
+    });
+
+    it('lanza error con statusCode 401 si el refresh token es invalido', async () => {
+      await expect(refreshUserSession({ refreshToken: 'token-basura-invalido' })).rejects.toMatchObject({
+        message: 'Sesion invalida o expirada',
+        statusCode: 401
+      });
     });
   });
 

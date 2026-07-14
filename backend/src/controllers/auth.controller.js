@@ -1,4 +1,4 @@
-import { registerUser, loginUser, forgotPassword as requestForgotPassword } from '../services/auth.service.js';
+import { registerUser, loginUser, refreshUserSession, forgotPassword as requestForgotPassword } from '../services/auth.service.js';
 
 export async function register(req, res) {
   const { email, password, name, role, faculty, career, phone } = req.body;
@@ -19,6 +19,17 @@ export async function login(req, res) {
   }
 
   const result = await loginUser({ email, password });
+  res.json(result);
+}
+
+export async function refresh(req, res) {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({ error: 'refreshToken es obligatorio' });
+  }
+
+  const result = await refreshUserSession({ refreshToken });
   res.json(result);
 }
 

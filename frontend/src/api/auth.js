@@ -14,6 +14,13 @@ export function loginRequest({ email, password }) {
   });
 }
 
+export function refreshRequest(refreshToken) {
+  return apiFetch("/auth/refresh", {
+    method: "POST",
+    body: { refreshToken }
+  });
+}
+
 export function forgotPasswordRequest(email) {
   return apiFetch("/auth/forgot-password", {
     method: "POST",
