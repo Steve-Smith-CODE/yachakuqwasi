@@ -12,7 +12,10 @@ import {
   ArrowUpDown,
   AlertTriangle,
   RotateCw,
-  Inbox
+  Inbox,
+  GraduationCap,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { buildRegistrationTrend, periodTrend } from "../utils/adminStats.js";
@@ -29,7 +32,10 @@ import {
   getAllHousingsRequest,
   getAllUsersRequest,
   setUserRoleRequest,
-  getAuditLogsRequest
+  getAuditLogsRequest,
+  getVerifiedDomainsRequest,
+  addVerifiedDomainRequest,
+  removeVerifiedDomainRequest
 } from "../api/admin.js";
 import { deleteHousingRequest } from "../api/housings.js";
 import { ApiError } from "../api/client.js";
@@ -43,7 +49,8 @@ const TABS = [
   { id: "listings", label: "Monitoreo de Anuncios", icon: Home },
   { id: "users", label: "Control de Usuarios", icon: Users },
   { id: "logs-admin", label: "Registro de Admin", icon: Compass },
-  { id: "logs-arrendadores", label: "Actividad de Arrendadores", icon: ClipboardList }
+  { id: "logs-arrendadores", label: "Actividad de Arrendadores", icon: ClipboardList },
+  { id: "dominios", label: "Dominios Verificados", icon: GraduationCap }
 ];
 
 const LOG_TYPE_META = {
@@ -210,6 +217,10 @@ export default function AdminPage() {
   const [allUsers, setAllUsers] = useState([]);
   const [adminLogs, setAdminLogs] = useState([]);
   const [landlordLogs, setLandlordLogs] = useState([]);
+  const [verifiedDomains, setVerifiedDomains] = useState([]);
+  const [newDomain, setNewDomain] = useState("");
+  const [newInstitutionName, setNewInstitutionName] = useState("");
+  const [domainError, setDomainError] = useState("");
   const [viewingListing, setViewingListing] = useState(null);
   const [viewingUserId, setViewingUserId] = useState(null);
   const [error, setError] = useState("");
@@ -223,13 +234,14 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [s, docs, housings, users, adminAuditLogs, landlordAuditLogs] = await Promise.all([
+      const [s, docs, housings, users, adminAuditLogs, landlordAuditLogs, domains] = await Promise.all([
         getStatsRequest(token),
         getPendingDocumentsRequest(token),
         getAllHousingsRequest(token),
         getAllUsersRequest(token),
         getAuditLogsRequest(token, "admin"),
-        getAuditLogsRequest(token, "arrendadores")
+        getAuditLogsRequest(token, "arrendadores"),
+        getVerifiedDomainsRequest(token)
       ]);
       setStats(s);
       setPendingDocs(docs);
@@ -237,6 +249,7 @@ export default function AdminPage() {
       setAllUsers(users);
       setAdminLogs(adminAuditLogs);
       setLandlordLogs(landlordAuditLogs);
+      setVerifiedDomains(domains);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No se pudo cargar el panel de administración.");
     } finally {
@@ -331,6 +344,25 @@ export default function AdminPage() {
   async function handleDeleteListing(item) {
     if (!window.confirm(`¿Eliminar permanentemente el anuncio "${item.title}"? No se puede deshacer.`)) return;
     await deleteHousingRequest(token, item.id);
+    loadAll();
+  }
+
+  async function handleAddDomain(e) {
+    e.preventDefault();
+    setDomainError("");
+    try {
+      await addVerifiedDomainRequest(token, newDomain.trim(), newInstitutionName.trim());
+      setNewDomain("");
+      setNewInstitutionName("");
+      loadAll();
+    } catch (err) {
+      setDomainError(err instanceof ApiError ? err.message : "No se pudo agregar el dominio.");
+    }
+  }
+
+  async function handleRemoveDomain(domain) {
+    if (!window.confirm(`¿Eliminar el dominio verificado "${domain}"? Los estudiantes ya no podrán declarar correos de ese dominio.`)) return;
+    await removeVerifiedDomainRequest(token, domain);
     loadAll();
   }
 
@@ -768,6 +800,71 @@ export default function AdminPage() {
                 Lo que cada arrendador hace sobre sus propios anuncios (pausar, publicar, editar, eliminar) y los favoritos que marcan los estudiantes.
               </p>
               <AuditLogList logs={landlordLogs} onOpenListing={openListingFromLog} emptyLabel="Sin actividad de arrendadores todavía." />
+            </div>
+          )}
+
+          {activeTab === "dominios" && (
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">Instituciones con Correo Verificado</h4>
+              <p className="text-[11px] text-slate-400 -mt-2">
+                Solo estudiantes con un correo de estos dominios pueden declarar "correo institucional" en su cuenta. Es una señal de confianza adicional, no reemplaza la revisión de documentos.
+              </p>
+
+              <form onSubmit={handleAddDomain} className="border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row gap-2.5">
+                <input
+                  type="text"
+                  placeholder="dominio.edu.pe"
+                  value={newDomain}
+                  onChange={(e) => setNewDomain(e.target.value)}
+                  required
+                  className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs"
+                />
+                <input
+                  type="text"
+                  placeholder="Nombre de la institución"
+                  value={newInstitutionName}
+                  onChange={(e) => setNewInstitutionName(e.target.value)}
+                  required
+                  className="flex-1 px-3 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-guindo text-xs"
+                />
+                <button
+                  type="submit"
+                  className="bg-guindo text-white hover:bg-guindo-dark px-4 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar
+                </button>
+              </form>
+
+              {domainError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{domainError}</p>
+              )}
+
+              {verifiedDomains.length === 0 ? (
+                <div className="border border-dashed border-slate-200 rounded-2xl p-10 text-center space-y-1.5">
+                  <GraduationCap className="h-8 w-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-bold text-slate-500">Sin dominios verificados todavía.</p>
+                  <p className="text-[11px] text-slate-400">Agrega el primero con el formulario de arriba.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {verifiedDomains.map((d) => (
+                    <div key={d.domain} className="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 bg-white">
+                      <div className="min-w-0">
+                        <span className="font-mono font-black text-guindo text-xs block">@{d.domain}</span>
+                        <span className="text-[11px] text-slate-500">{d.institution_name}</span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveDomain(d.domain)}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg cursor-pointer shrink-0"
+                        aria-label={`Eliminar dominio ${d.domain}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

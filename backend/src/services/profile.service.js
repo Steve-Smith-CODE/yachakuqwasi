@@ -1,6 +1,6 @@
 import { updateProfileFields, updateProfileAvatar, findPublicProfileById } from '../repositories/profile.repository.js';
 import { updateAuthPassword } from '../repositories/auth.repository.js';
-import { insertAuditLog } from '../repositories/admin.repository.js';
+import { insertAuditLog, findVerifiedDomainByDomain } from '../repositories/admin.repository.js';
 import { findApprovedHousingsByLandlord } from '../repositories/housing.repository.js';
 import { uploadAvatar } from './avatar.service.js';
 import { AppError, NotFoundError } from '../errors/AppError.js';
@@ -64,10 +64,22 @@ export async function changeAvatar(userId, imageDataUrl, actor) {
 
 // Autodeclarado: no hay proveedor de correo transaccional configurado en
 // este proyecto para mandar un link de confirmacion, asi que esto es una
-// señal de confianza barata (coincide con el dominio institucional) y no
-// un "verificado" real - complementa la revision manual de documentos, no
-// la reemplaza.
+// señal de confianza barata (el dominio esta en la lista de instituciones
+// que el admin marco como validas, ver admin.service.js:addVerifiedDomain)
+// y no un "verificado" real - complementa la revision manual de documentos,
+// no la reemplaza.
 export async function setInstitutionalEmail(userId, institutionalEmail, actor) {
+  const domain = institutionalEmail.split('@')[1]?.toLowerCase();
+  const { data: verifiedDomain } = await findVerifiedDomainByDomain(domain);
+
+  if (!verifiedDomain) {
+    throw new AppError(
+      'Ese dominio no está en la lista de instituciones verificadas.',
+      400,
+      'DOMAIN_NOT_VERIFIED'
+    );
+  }
+
   const { data, error } = await updateProfileFields(userId, { institutional_email: institutionalEmail });
 
   if (error) {

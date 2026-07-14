@@ -12,13 +12,22 @@ import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
 const createdListingIds = [];
+const createdDomains = [];
 
 afterAll(async () => {
   for (const id of createdListingIds.splice(0)) {
     await supabaseAdmin.from('housing_listings').delete().eq('id', id).catch?.(() => {});
   }
+  for (const domain of createdDomains.splice(0)) {
+    await supabaseAdmin.from('verified_domains').delete().eq('domain', domain).catch?.(() => {});
+  }
   await cleanupCreatedUsers();
 });
+
+async function insertVerifiedDomainForTest(domain, institutionName = 'Institución de prueba') {
+  await supabaseAdmin.from('verified_domains').insert({ domain, institution_name: institutionName });
+  createdDomains.push(domain);
+}
 
 const TINY_PNG_BASE64 =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
@@ -194,15 +203,25 @@ describe('Profile Service (Supabase local real)', () => {
   });
 
   describe('setInstitutionalEmail', () => {
-    it('guarda el correo institucional real del usuario', async () => {
+    it('guarda el correo institucional real si el dominio esta en la lista verificada', async () => {
+      const domain = `dominio-service-${Date.now()}.edu.pe`;
+      await insertVerifiedDomainForTest(domain);
       const student = await createRealUser({ role: 'student' });
 
-      const updated = await setInstitutionalEmail(student.id, 'estudiante@unsch.edu.pe', { name: 'Estudiante Test' });
+      const updated = await setInstitutionalEmail(student.id, `estudiante@${domain}`, { name: 'Estudiante Test' });
 
-      expect(updated.institutional_email).toBe('estudiante@unsch.edu.pe');
+      expect(updated.institutional_email).toBe(`estudiante@${domain}`);
+    });
+
+    it('rechaza con DOMAIN_NOT_VERIFIED si el dominio no esta en la lista verificada', async () => {
+      await expect(
+        setInstitutionalEmail('cualquier-id', 'x@dominio-que-no-existe-jamas.edu.pe')
+      ).rejects.toMatchObject({ statusCode: 400, code: 'DOMAIN_NOT_VERIFIED' });
     });
 
     it('lanza AppError con INSTITUTIONAL_EMAIL_UPDATE_FAILED si el repositorio falla', async () => {
+      const domain = `dominio-service-fail-${Date.now()}.edu.pe`;
+      await insertVerifiedDomainForTest(domain);
       const originalFn = profileRepo.updateProfileFields;
       profileRepo.updateProfileFields = jest.fn().mockResolvedValue({
         data: null,
@@ -210,7 +229,7 @@ describe('Profile Service (Supabase local real)', () => {
       });
 
       try {
-        await expect(setInstitutionalEmail('cualquier-id', 'x@unsch.edu.pe')).rejects.toMatchObject({
+        await expect(setInstitutionalEmail('cualquier-id', `x@${domain}`)).rejects.toMatchObject({
           statusCode: 400,
           code: 'INSTITUTIONAL_EMAIL_UPDATE_FAILED'
         });

@@ -190,4 +190,70 @@ describe('Admin Integration (Supabase local real)', () => {
 
     expect(res.status).toBe(403);
   });
+
+  describe('Dominios verificados', () => {
+    const createdDomains = [];
+
+    afterAll(async () => {
+      for (const domain of createdDomains.splice(0)) {
+        await supabaseAdmin.from('verified_domains').delete().eq('domain', domain).catch?.(() => {});
+      }
+    });
+
+    it('debe agregar un dominio real y verlo en la lista', async () => {
+      const admin = await createRealUser({ role: 'admin' });
+      const token = await loginAndGetToken(admin);
+      const domainName = `dominio-integration-admin-${Date.now()}.edu.pe`;
+      createdDomains.push(domainName);
+
+      const addRes = await request(app)
+        .post('/api/admin/dominios')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ domain: domainName, institutionName: 'Universidad Integración' });
+      expect(addRes.status).toBe(200);
+      expect(addRes.body.domain.domain).toBe(domainName);
+
+      const listRes = await request(app).get('/api/admin/dominios').set('Authorization', `Bearer ${token}`);
+      expect(listRes.status).toBe(200);
+      expect(listRes.body.map((d) => d.domain)).toContain(domainName);
+    });
+
+    it('debe rechazar un dominio con formato invalido', async () => {
+      const admin = await createRealUser({ role: 'admin' });
+      const token = await loginAndGetToken(admin);
+
+      const res = await request(app)
+        .post('/api/admin/dominios')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ domain: 'no es un dominio', institutionName: 'X' });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('debe eliminar un dominio real', async () => {
+      const admin = await createRealUser({ role: 'admin' });
+      const token = await loginAndGetToken(admin);
+      const domainName = `dominio-integration-remove-${Date.now()}.edu.pe`;
+      await request(app)
+        .post('/api/admin/dominios')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ domain: domainName, institutionName: 'A eliminar' });
+
+      const res = await request(app)
+        .delete(`/api/admin/dominios/${domainName}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ message: 'Dominio eliminado' });
+    });
+
+    it('debe rechazar el acceso a dominios si el usuario autenticado no es admin', async () => {
+      const student = await createRealUser({ role: 'student' });
+      const token = await loginAndGetToken(student);
+
+      const res = await request(app).get('/api/admin/dominios').set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
 });

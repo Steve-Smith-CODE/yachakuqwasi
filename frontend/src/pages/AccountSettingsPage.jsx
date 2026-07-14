@@ -239,7 +239,7 @@ export default function AccountSettingsPage() {
           <span>Correo Institucional</span>
         </h4>
         <p className="text-[11px] text-slate-400 -mt-2">
-          Declara tu correo institucional (.edu.pe) como una señal de confianza adicional. No reemplaza la revisión de tus documentos.
+          Declara tu correo institucional como una señal de confianza adicional (debe pertenecer a una institución verificada por el administrador). No reemplaza la revisión de tus documentos.
         </p>
 
         {emailError && (

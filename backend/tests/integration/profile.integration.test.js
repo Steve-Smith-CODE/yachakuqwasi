@@ -1,8 +1,14 @@
 import request from 'supertest';
 import app from '../../src/app.js';
+import { supabaseAdmin } from '../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../helpers/testData.js';
 
+const createdDomains = [];
+
 afterAll(async () => {
+  for (const domain of createdDomains.splice(0)) {
+    await supabaseAdmin.from('verified_domains').delete().eq('domain', domain).catch?.(() => {});
+  }
   await cleanupCreatedUsers();
 });
 
@@ -115,5 +121,33 @@ describe('Profile Integration (Supabase local real)', () => {
     expect(res.status).toBe(200);
     expect(res.body.profile.avatar_url).toMatch(/\.webp$/);
     expect(res.body.profile.avatar_url).toContain('avatars');
+  });
+
+  it('debe declarar el correo institucional real si el dominio esta verificado', async () => {
+    const domain = `dominio-integration-${Date.now()}.edu.pe`;
+    createdDomains.push(domain);
+    await supabaseAdmin.from('verified_domains').insert({ domain, institution_name: 'Institución Integración' });
+    const student = await createRealUser({ role: 'student' });
+    const token = await loginAndGetToken(student);
+
+    const res = await request(app)
+      .patch('/api/perfil/correo-institucional')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ institutionalEmail: `estudiante@${domain}` });
+
+    expect(res.status).toBe(200);
+    expect(res.body.profile.institutional_email).toBe(`estudiante@${domain}`);
+  });
+
+  it('debe rechazar el correo institucional si el dominio no esta verificado', async () => {
+    const student = await createRealUser({ role: 'student' });
+    const token = await loginAndGetToken(student);
+
+    const res = await request(app)
+      .patch('/api/perfil/correo-institucional')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ institutionalEmail: 'x@dominio-jamas-verificado.edu.pe' });
+
+    expect(res.status).toBe(400);
   });
 });

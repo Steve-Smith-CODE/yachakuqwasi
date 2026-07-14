@@ -27,3 +27,12 @@ export const setRoleSchema = z.object({
     errorMap: () => ({ message: "rol debe ser 'student', 'landlord' o 'admin'" })
   })
 });
+
+export const addVerifiedDomainSchema = z.object({
+  domain: z
+    .string()
+    .min(3)
+    .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i, 'Formato de dominio inválido')
+    .transform((d) => d.toLowerCase()),
+  institutionName: z.string().min(1, 'El nombre de la institución es obligatorio')
+});

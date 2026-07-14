@@ -12,7 +12,10 @@ import {
   findAllProfiles,
   updateProfileRole,
   insertAuditLog,
-  findAuditLogs
+  findAuditLogs,
+  findVerifiedDomains,
+  insertVerifiedDomain,
+  deleteVerifiedDomain
 } from '../repositories/admin.repository.js';
 import { findHousingById, findHousingsByLandlord } from '../repositories/housing.repository.js';
 import { findProfileById, findAuthUserById, deleteAuthUser } from '../repositories/auth.repository.js';
@@ -345,4 +348,69 @@ export async function getUserDetail(userId) {
     favorites,
     activity: activity || []
   };
+}
+
+export async function getVerifiedDomains() {
+  const { data, error } = await findVerifiedDomains();
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 500;
+    throw err;
+  }
+
+  return data;
+}
+
+// Lista de instituciones cuyo dominio de correo se acepta al "declarar correo
+// institucional" (ver profile.service.js:setInstitutionalEmail) - reemplaza
+// el chequeo generico de sufijo ".edu.pe" por una lista curada por el admin,
+// para no aceptar cualquier institucion peruana sino solo las que el admin
+// autorizo explicitamente.
+export async function addVerifiedDomain({ domain, institutionName }, actor) {
+  const normalizedDomain = domain.toLowerCase();
+  const { data, error } = await insertVerifiedDomain(normalizedDomain, institutionName);
+
+  if (error) {
+    const err = new Error(error.code === '23505' ? 'Ese dominio ya está registrado.' : error.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const { error: auditError } = await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: 'Agregó dominio verificado',
+    details: `${normalizedDomain} (${institutionName})`,
+    type: 'system'
+  });
+  if (auditError) {
+    logger.warn(`No se pudo registrar la auditoría del dominio ${normalizedDomain}: ${auditError.message}`);
+  }
+
+  return data;
+}
+
+export async function removeVerifiedDomain(domain, actor) {
+  const normalizedDomain = domain.toLowerCase();
+  const { error } = await deleteVerifiedDomain(normalizedDomain);
+
+  if (error) {
+    const err = new Error(error.message);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const { error: auditError } = await insertAuditLog({
+    userId: actor?.id,
+    actorName: actor?.name ?? 'Admin',
+    action: 'Eliminó dominio verificado',
+    details: normalizedDomain,
+    type: 'system'
+  });
+  if (auditError) {
+    logger.warn(`No se pudo registrar la auditoría del dominio ${normalizedDomain}: ${auditError.message}`);
+  }
+
+  return { message: 'Dominio eliminado' };
 }

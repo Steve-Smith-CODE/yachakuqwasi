@@ -11,7 +11,10 @@ import {
   getAllUsers,
   setUserRole,
   getAuditLogs,
-  getUserDetail
+  getUserDetail,
+  getVerifiedDomains,
+  addVerifiedDomain,
+  removeVerifiedDomain
 } from '../../../src/services/admin.service.js';
 import * as adminRepo from '../../../src/repositories/admin.repository.js';
 import * as notificationsService from '../../../src/services/notifications.service.js';
@@ -423,6 +426,69 @@ describe('Admin Service (Supabase local real)', () => {
 
     it('lanza error con statusCode 400 si el id no es un uuid valido (error real de Postgres)', async () => {
       await expect(setUserRole('esto-no-es-un-uuid', 'landlord')).rejects.toMatchObject({ statusCode: 400 });
+    });
+  });
+
+  describe('getVerifiedDomains + addVerifiedDomain + removeVerifiedDomain', () => {
+    const createdTestDomains = [];
+
+    afterAll(async () => {
+      for (const domain of createdTestDomains.splice(0)) {
+        await supabaseAdmin.from('verified_domains').delete().eq('domain', domain).catch?.(() => {});
+      }
+    });
+
+    it('agrega un dominio real y aparece en la lista', async () => {
+      const domain = `dominio-admin-${Date.now()}.edu.pe`;
+      createdTestDomains.push(domain);
+
+      const created = await addVerifiedDomain({ domain, institutionName: 'Universidad de Prueba' });
+      const list = await getVerifiedDomains();
+
+      expect(created.domain).toBe(domain);
+      expect(list.map((d) => d.domain)).toContain(domain);
+    });
+
+    it('normaliza el dominio a minusculas', async () => {
+      const domain = `dominio-mayus-${Date.now()}.edu.pe`;
+      createdTestDomains.push(domain);
+
+      const created = await addVerifiedDomain({ domain: domain.toUpperCase(), institutionName: 'Universidad Mayus' });
+
+      expect(created.domain).toBe(domain);
+    });
+
+    it('lanza error 400 con mensaje claro si el dominio ya existe', async () => {
+      const domain = `dominio-duplicado-${Date.now()}.edu.pe`;
+      createdTestDomains.push(domain);
+      await addVerifiedDomain({ domain, institutionName: 'Primera vez' });
+
+      await expect(addVerifiedDomain({ domain, institutionName: 'Segunda vez' })).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Ese dominio ya está registrado.'
+      });
+    });
+
+    it('elimina un dominio real', async () => {
+      const domain = `dominio-a-borrar-${Date.now()}.edu.pe`;
+      await addVerifiedDomain({ domain, institutionName: 'Se va a borrar' });
+
+      const result = await removeVerifiedDomain(domain);
+
+      expect(result).toEqual({ message: 'Dominio eliminado' });
+      const list = await getVerifiedDomains();
+      expect(list.map((d) => d.domain)).not.toContain(domain);
+    });
+
+    it('getVerifiedDomains lanza error 500 si el repositorio falla', async () => {
+      const originalFn = adminRepo.findVerifiedDomains;
+      adminRepo.findVerifiedDomains = jest.fn().mockResolvedValue({ data: null, error: { message: 'fail' } });
+
+      try {
+        await expect(getVerifiedDomains()).rejects.toMatchObject({ statusCode: 500 });
+      } finally {
+        adminRepo.findVerifiedDomains = originalFn;
+      }
     });
   });
 

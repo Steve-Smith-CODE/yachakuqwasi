@@ -19,10 +19,10 @@ export const updateAvatarSchema = z.object({
 
 // Autodeclarado, no verificado por link de confirmación (no hay proveedor de
 // correo transaccional configurado en el proyecto) - es una señal de
-// confianza complementaria a la revisión manual de documentos, no la reemplaza.
+// confianza complementaria a la revisión manual de documentos, no la
+// reemplaza. El formato solo valida que sea un email; que el dominio
+// pertenezca a una institución verificada se chequea en el servicio contra
+// la tabla verified_domains (ver profile.service.js:setInstitutionalEmail).
 export const institutionalEmailSchema = z.object({
-  institutionalEmail: z
-    .string()
-    .email('Correo inválido')
-    .refine((email) => email.toLowerCase().endsWith('.edu.pe'), 'Debe ser un correo institucional (.edu.pe)')
+  institutionalEmail: z.string().email('Correo inválido')
 });

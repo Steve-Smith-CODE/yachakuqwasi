@@ -13,7 +13,10 @@ import {
   setUserRoleRequest,
   blockUserRequest,
   reactivateUserRequest,
-  deleteUserRequest
+  deleteUserRequest,
+  getVerifiedDomainsRequest,
+  addVerifiedDomainRequest,
+  removeVerifiedDomainRequest
 } from "../api/admin.js";
 import { deleteHousingRequest } from "../api/housings.js";
 
@@ -33,7 +36,10 @@ vi.mock("../api/admin.js", () => ({
   getAllHousingsRequest: vi.fn(),
   getAllUsersRequest: vi.fn(),
   setUserRoleRequest: vi.fn(),
-  getAuditLogsRequest: vi.fn()
+  getAuditLogsRequest: vi.fn(),
+  getVerifiedDomainsRequest: vi.fn(),
+  addVerifiedDomainRequest: vi.fn(),
+  removeVerifiedDomainRequest: vi.fn()
 }));
 
 vi.mock("../api/housings.js", () => ({
@@ -134,6 +140,9 @@ function setupDefaults() {
   reactivateUserRequest.mockResolvedValue({});
   deleteUserRequest.mockResolvedValue({});
   deleteHousingRequest.mockResolvedValue({});
+  getVerifiedDomainsRequest.mockResolvedValue([]);
+  addVerifiedDomainRequest.mockResolvedValue({});
+  removeVerifiedDomainRequest.mockResolvedValue({});
 }
 
 beforeEach(() => {
@@ -347,5 +356,61 @@ describe("AdminPage", () => {
 
     expect(await screen.findByTestId("admin-user-modal")).toHaveAttribute("data-user-id", "u2");
     expect(screen.getByText("Control de Usuarios").closest("button").className).toMatch(/bg-guindo/);
+  });
+
+  it("dominios: cola vacia muestra el mensaje de sin dominios", async () => {
+    render(<AdminPage />);
+    fireEvent.click(await screen.findByText("Dominios Verificados"));
+
+    expect(await screen.findByText("Sin dominios verificados todavía.")).toBeInTheDocument();
+  });
+
+  it("dominios: lista los dominios reales con su institucion", async () => {
+    getVerifiedDomainsRequest.mockResolvedValue([{ domain: "unsch.edu.pe", institution_name: "UNSCH" }]);
+    render(<AdminPage />);
+    fireEvent.click(await screen.findByText("Dominios Verificados"));
+
+    expect(await screen.findByText("@unsch.edu.pe")).toBeInTheDocument();
+    expect(screen.getByText("UNSCH")).toBeInTheDocument();
+  });
+
+  it("dominios: agregar uno nuevo llama al endpoint y recarga la lista", async () => {
+    render(<AdminPage />);
+    fireEvent.click(await screen.findByText("Dominios Verificados"));
+    await screen.findByText("Sin dominios verificados todavía.");
+
+    fireEvent.change(screen.getByPlaceholderText("dominio.edu.pe"), { target: { value: "unsch.edu.pe" } });
+    fireEvent.change(screen.getByPlaceholderText("Nombre de la institución"), { target: { value: "UNSCH" } });
+    fireEvent.click(screen.getByText("Agregar"));
+
+    await waitFor(() => expect(addVerifiedDomainRequest).toHaveBeenCalledWith("tok", "unsch.edu.pe", "UNSCH"));
+  });
+
+  it("dominios: muestra el error si falla al agregar", async () => {
+    addVerifiedDomainRequest.mockRejectedValueOnce(new Error("Ese dominio ya está registrado."));
+    render(<AdminPage />);
+    fireEvent.click(await screen.findByText("Dominios Verificados"));
+    await screen.findByText("Sin dominios verificados todavía.");
+
+    fireEvent.change(screen.getByPlaceholderText("dominio.edu.pe"), { target: { value: "unsch.edu.pe" } });
+    fireEvent.change(screen.getByPlaceholderText("Nombre de la institución"), { target: { value: "UNSCH" } });
+    fireEvent.click(screen.getByText("Agregar"));
+
+    expect(await screen.findByText("No se pudo agregar el dominio.")).toBeInTheDocument();
+  });
+
+  it("dominios: eliminar pide confirmacion y llama al endpoint solo si se confirma", async () => {
+    getVerifiedDomainsRequest.mockResolvedValue([{ domain: "unsch.edu.pe", institution_name: "UNSCH" }]);
+    render(<AdminPage />);
+    fireEvent.click(await screen.findByText("Dominios Verificados"));
+    await screen.findByText("@unsch.edu.pe");
+
+    vi.spyOn(window, "confirm").mockReturnValueOnce(false);
+    fireEvent.click(screen.getByLabelText("Eliminar dominio unsch.edu.pe"));
+    expect(removeVerifiedDomainRequest).not.toHaveBeenCalled();
+
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    fireEvent.click(screen.getByLabelText("Eliminar dominio unsch.edu.pe"));
+    await waitFor(() => expect(removeVerifiedDomainRequest).toHaveBeenCalledWith("tok", "unsch.edu.pe"));
   });
 });

@@ -11,7 +11,10 @@ import {
   getAllUsers,
   setUserRole,
   getAuditLogs,
-  getUserDetail
+  getUserDetail,
+  getVerifiedDomains,
+  addVerifiedDomain,
+  removeVerifiedDomain
 } from '../services/admin.service.js';
 
 export async function stats(req, res) {
@@ -70,4 +73,18 @@ export async function setRole(req, res) {
 
 export async function logs(req, res) {
   res.json(await getAuditLogs(req.query.scope));
+}
+
+export async function getDomains(req, res) {
+  res.json(await getVerifiedDomains());
+}
+
+export async function addDomain(req, res) {
+  const domain = await addVerifiedDomain(req.body, req.user);
+  res.json({ domain });
+}
+
+export async function removeDomain(req, res) {
+  const result = await removeVerifiedDomain(req.params.domain, req.user);
+  res.json(result);
 }

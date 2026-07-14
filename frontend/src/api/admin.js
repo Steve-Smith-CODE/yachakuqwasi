@@ -48,6 +48,18 @@ export function reactivateUserRequest(token, userId) {
   return apiFetch(`/admin/usuarios/${userId}/reactivar`, { method: "PUT", token });
 }
 
+export function getVerifiedDomainsRequest(token) {
+  return apiFetch("/admin/dominios", { token });
+}
+
+export function addVerifiedDomainRequest(token, domain, institutionName) {
+  return apiFetch("/admin/dominios", { method: "POST", token, body: { domain, institutionName } });
+}
+
+export function removeVerifiedDomainRequest(token, domain) {
+  return apiFetch(`/admin/dominios/${domain}`, { method: "DELETE", token });
+}
+
 export function deleteUserRequest(token, userId, motivo) {
   return apiFetch(`/admin/usuarios/${userId}`, { method: "DELETE", token, body: { motivo } });
 }

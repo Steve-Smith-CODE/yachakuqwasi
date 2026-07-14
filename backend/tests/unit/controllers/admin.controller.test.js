@@ -11,13 +11,17 @@ import {
   allUsers,
   userDetail,
   setRole,
-  logs
+  logs,
+  getDomains,
+  addDomain,
+  removeDomain
 } from '../../../src/controllers/admin.controller.js';
 import { supabaseAdmin } from '../../../src/config/supabase.js';
 import { createRealUser, cleanupCreatedUsers } from '../../helpers/testData.js';
 
 const createdDocIds = [];
 const createdListingIds = [];
+const createdDomains = [];
 
 afterAll(async () => {
   for (const id of createdDocIds.splice(0)) {
@@ -25,6 +29,9 @@ afterAll(async () => {
   }
   for (const id of createdListingIds.splice(0)) {
     await supabaseAdmin.from('housing_listings').delete().eq('id', id).catch?.(() => {});
+  }
+  for (const domain of createdDomains.splice(0)) {
+    await supabaseAdmin.from('verified_domains').delete().eq('domain', domain).catch?.(() => {});
   }
   await cleanupCreatedUsers();
 });
@@ -233,5 +240,44 @@ describe('Admin Controller (Supabase local real)', () => {
 
     const body = res.json.mock.calls[res.json.mock.calls.length - 1][0];
     expect(Array.isArray(body)).toBe(true);
+  });
+
+  it('addDomain agrega un dominio real y envuelve el resultado en { domain }', async () => {
+    const domainName = `dominio-controller-${Date.now()}.edu.pe`;
+    createdDomains.push(domainName);
+    req.body = { domain: domainName, institutionName: 'Universidad Controller' };
+    req.user = { id: 'admin-id', name: 'Admin Test' };
+
+    await addDomain(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.domain.domain).toBe(domainName);
+  });
+
+  it('getDomains responde con la lista real de dominios verificados', async () => {
+    const domainName = `dominio-controller-list-${Date.now()}.edu.pe`;
+    createdDomains.push(domainName);
+    await addDomain(
+      { params: {}, body: { domain: domainName, institutionName: 'Universidad Lista' }, query: {}, user: {} },
+      { json: jest.fn() }
+    );
+
+    await getDomains(req, res);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.map((d) => d.domain)).toContain(domainName);
+  });
+
+  it('removeDomain elimina un dominio real y responde con el mensaje', async () => {
+    const domainName = `dominio-controller-remove-${Date.now()}.edu.pe`;
+    await addDomain(
+      { params: {}, body: { domain: domainName, institutionName: 'Universidad a eliminar' }, query: {}, user: {} },
+      { json: jest.fn() }
+    );
+    req.params.domain = domainName;
+
+    await removeDomain(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ message: 'Dominio eliminado' });
   });
 });

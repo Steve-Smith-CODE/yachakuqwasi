@@ -12,11 +12,21 @@ import {
   allUsers,
   setRole,
   logs,
-  userDetail
+  userDetail,
+  getDomains,
+  addDomain,
+  removeDomain
 } from '../controllers/admin.controller.js';
 import { requireAuth, requireRole } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
-import { reviewDocSchema, blockUserSchema, deleteUserSchema, housingStatusSchema, setRoleSchema } from '../validators/admin.validator.js';
+import {
+  reviewDocSchema,
+  blockUserSchema,
+  deleteUserSchema,
+  housingStatusSchema,
+  setRoleSchema,
+  addVerifiedDomainSchema
+} from '../validators/admin.validator.js';
 
 const router = Router();
 
@@ -35,5 +45,8 @@ router.put('/usuarios/:id/reactivar', unblock);
 router.delete('/usuarios/:id', validate(deleteUserSchema), deleteUser);
 router.put('/usuarios/:id/rol', validate(setRoleSchema), setRole);
 router.get('/logs', logs);
+router.get('/dominios', getDomains);
+router.post('/dominios', validate(addVerifiedDomainSchema), addDomain);
+router.delete('/dominios/:domain', removeDomain);
 
 export default router;

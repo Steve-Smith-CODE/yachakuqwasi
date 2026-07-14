@@ -89,3 +89,19 @@ export function findAuditLogs({ types, listingId, userId } = {}) {
 
   return query;
 }
+
+export function findVerifiedDomains() {
+  return supabaseAdmin.from('verified_domains').select('*').order('domain', { ascending: true });
+}
+
+export function findVerifiedDomainByDomain(domain) {
+  return supabaseAdmin.from('verified_domains').select('*').eq('domain', domain).maybeSingle();
+}
+
+export function insertVerifiedDomain(domain, institutionName) {
+  return supabaseAdmin.from('verified_domains').insert({ domain, institution_name: institutionName }).select().single();
+}
+
+export function deleteVerifiedDomain(domain) {
+  return supabaseAdmin.from('verified_domains').delete().eq('domain', domain);
+}
